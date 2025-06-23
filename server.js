@@ -45,7 +45,7 @@ const server = http.createServer(app);
 // Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "https://bizzyy.netlify.app/",
+    origin: process.env.FRONTEND_URL || "https://bizzyy.netlify.app",
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -55,7 +55,7 @@ setupSocketIO(io);
 // Middleware
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "https://bizzyy.netlify.app/",
+    origin: process.env.FRONTEND_URL || "https://bizzyy.netlify.app",
     credentials: true,
   })
 );
