@@ -375,9 +375,8 @@ export const completeRegistration = async (req, res) => {
     registrationVerificationStore.delete(email);
 
     // Generate JWT token
-    // Generate JWT token
     const token = jwt.sign(
-      { id: user._id, role: user.role, UserType: user.UserType },
+      { id: newUser._id, role: newUser.role, UserType: newUser.UserType },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -548,7 +547,6 @@ export const verifyLoginCode = async (req, res) => {
     await user.save();
 
     // Generate JWT token
-    // Generate JWT token
     const token = jwt.sign(
       { id: user._id, role: user.role, UserType: user.UserType },
       process.env.JWT_SECRET,
@@ -653,6 +651,7 @@ export const googleRegister = async (req, res) => {
     role = "user",
     UserType = "freelancer",
     referredBy,
+    deviceId,
   } = req.body;
 
   try {
@@ -682,15 +681,16 @@ export const googleRegister = async (req, res) => {
         message: "User already exists. Please login instead.",
       });
     }
-    const existingDevice = await UserModel.findOne({
-      deviceId: req.body.deviceId,
-    });
-
-    if (existingDevice) {
-      return res.status(400).json({
-        success: false,
-        message: "A user is already registered from this device",
+    if (req.body.deviceId) {
+      const existingDevice = await UserModel.findOne({
+        deviceId: req.body.deviceId,
       });
+      if (existingDevice) {
+        return res.status(400).json({
+          success: false,
+          message: "A user is already registered from this device",
+        });
+      }
     }
     // Create new user
     const referralCode = generateReferralCode();
@@ -706,7 +706,7 @@ export const googleRegister = async (req, res) => {
       role,
       UserType,
       isVerified: true,
-      deviceId: req.body.deviceId,
+      deviceId: deviceId,
     });
 
     await newUser.save();
