@@ -196,14 +196,18 @@ export const sendRegistrationVerification = async (req, res) => {
         message: "User already exists with this email or username",
       });
     }
-    const existingDevice = await UserModel.findOne({
-      deviceId: req.body.deviceId,
-    });
-    if (existingDevice) {
-      return res.status(400).json({
-        success: false,
-        message: "A user is already registered from this device",
+
+    // Only check for existing device if deviceId is provided and not empty
+    if (req.body.deviceId) {
+      const existingDevice = await UserModel.findOne({
+        deviceId: req.body.deviceId,
       });
+      if (existingDevice) {
+        return res.status(400).json({
+          success: false,
+          message: "A user is already registered from this device",
+        });
+      }
     }
 
     // Generate and store verification code
