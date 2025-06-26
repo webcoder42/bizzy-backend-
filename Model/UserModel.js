@@ -294,7 +294,14 @@ const userSchema = new mongoose.Schema(
       twitter: String,
       website: String,
     },
-
+    resetPasswordToken: {
+      type: String,
+      default: null,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      default: null,
+    },
     portfolio: [
       {
         title: String,
