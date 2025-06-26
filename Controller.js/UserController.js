@@ -6,6 +6,7 @@ import { OAuth2Client } from "google-auth-library";
 import nodemailer from "nodemailer";
 import UserModel from "../Model/UserModel.js";
 import sanitize from "mongo-sanitize";
+import { v4 as uuidv4 } from "uuid";
 /* 
 =============================================
 REGISTRATION-SPECIFIC UTILITIES AND STORAGE
@@ -375,8 +376,9 @@ export const completeRegistration = async (req, res) => {
     registrationVerificationStore.delete(email);
 
     // Generate JWT token
+    // Generate JWT token
     const token = jwt.sign(
-      { id: newUser._id, role: newUser.role, UserType: newUser.UserType },
+      { id: user._id, role: user.role, UserType: user.UserType },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -547,6 +549,7 @@ export const verifyLoginCode = async (req, res) => {
     await user.save();
 
     // Generate JWT token
+    // Generate JWT token
     const token = jwt.sign(
       { id: user._id, role: user.role, UserType: user.UserType },
       process.env.JWT_SECRET,
@@ -565,13 +568,12 @@ export const verifyLoginCode = async (req, res) => {
     const userResponse = {
       _id: user._id,
       Fullname: user.Fullname,
-      username: user.username,
       email: user.email,
+      username: user.username,
+      profileImage: user.profileImage,
       role: user.role,
       UserType: user.UserType,
-      profileImage: user.profileImage,
       isVerified: user.isVerified,
-      createdAt: user.createdAt,
     };
 
     // Clean up
@@ -681,9 +683,9 @@ export const googleRegister = async (req, res) => {
         message: "User already exists. Please login instead.",
       });
     }
-    if (req.body.deviceId) {
+    if (deviceId) {
       const existingDevice = await UserModel.findOne({
-        deviceId: req.body.deviceId,
+        deviceId: deviceId,
       });
       if (existingDevice) {
         return res.status(400).json({
@@ -1447,6 +1449,142 @@ export const getProfileCompletion = async (req, res) => {
     });
   } catch (error) {
     console.error("Profile completion check error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+/* 
+=============================================
+FORGOT PASSWORD CONTROLLERS
+=============================================
+*/
+
+// 1. Request password reset (send email with link)
+export const requestPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No user found with this email" });
+    }
+    // Generate token and expiry
+    const resetToken = uuidv4();
+    const resetExpires = Date.now() + 1000 * 60 * 15; // 15 min
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = resetExpires;
+    await user.save();
+    // Send email
+    const resetUrl = `${API_FRONTENT_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(
+      email
+    )}`;
+    // Use hardcoded credentials for testing
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "bizy83724@gmail.com",
+        pass: "ddrd kpnn ptjb zxnt",
+      },
+    });
+    const mailOptions = {
+      from: '"Password Reset" <bizy83724@gmail.com>',
+      to: email,
+      subject: "Reset your password",
+      html: `<div style="font-family:sans-serif;">
+        <h2>Password Reset Request</h2>
+        <p>Click the link below to reset your password. This link will expire in 15 minutes.</p>
+        <a href="${resetUrl}" style="color:blue;">Reset Password</a>
+        <p>If you did not request this, please ignore this email.</p>
+      </div>`,
+    };
+    await transporter.sendMail(mailOptions);
+    return res.status(200).json({
+      success: true,
+      message: "Password reset link sent to your email",
+    });
+  } catch (error) {
+    console.error("Request password reset error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// 2. Verify reset token (for frontend to check before showing reset form)
+export const verifyResetToken = async (req, res) => {
+  try {
+    const { email, token } = req.query;
+    if (!email || !token) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email and token are required" });
+    }
+    const user = await UserModel.findOne({ email, resetPasswordToken: token });
+    if (
+      !user ||
+      !user.resetPasswordExpires ||
+      user.resetPasswordExpires < Date.now()
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired reset token" });
+    }
+    return res.status(200).json({ success: true, message: "Token valid" });
+  } catch (error) {
+    console.error("Verify reset token error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// 3. Reset password (set new password)
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, token, newPassword } = req.body;
+    if (!email || !token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, token, and new password are required",
+      });
+    }
+    const user = await UserModel.findOne({ email, resetPasswordToken: token });
+    if (
+      !user ||
+      !user.resetPasswordExpires ||
+      user.resetPasswordExpires < Date.now()
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired reset token" });
+    }
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+    return res.status(200).json({
+      success: true,
+      message:
+        "Password reset successful. You can now login with your new password.",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
     return res.status(500).json({
       success: false,
       message: "Internal server error",
