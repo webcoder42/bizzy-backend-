@@ -20,6 +20,9 @@ import {
   verifyLoginCode,
   verifyRegistrationEmail,
   getProfileCompletion,
+  requestPasswordReset,
+  verifyResetToken,
+  resetPassword,
 } from "../Controller.js/UserController.js";
 import { loginLimiter } from "./../middleware/rateLimiter.js";
 import { isAdmin, requireSignIn } from "./../middleware/UserMiddleware.js";
@@ -99,4 +102,14 @@ router.put("/update/:id", requireSignIn, isAdmin, updateUserById);
 router.delete("/delete/:id", requireSignIn, isAdmin, deleteUserById);
 
 router.get("/user/details/:id", getUserCompleteDetails);
+
+/* 
+=============================================
+FORGOT PASSWORD ROUTES
+=============================================
+*/
+router.post("/forgot-password/request", requestPasswordReset);
+router.get("/forgot-password/verify", verifyResetToken);
+router.post("/forgot-password/reset", resetPassword);
+
 export default router;
