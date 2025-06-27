@@ -4,17 +4,17 @@
 export const BiZZyKnowledgeBase = {
   // Platform Overview
   platform: {
-    name: "BiZZy",
-    description: "BiZy is a freelancing platform...",
+    name: "BuzYoo",
+    description: "BuzYoo is a freelancing platform...",
     tagline: "Connecting top-tier talent with global opportunities through a seamless, user-friendly experience.",
     type: "Freelance Platform",
     targetUsers: ["Freelancers", "Clients", "Businesses", "Entrepreneurs"]
   },
 
-  // What is BiZZy
+  // What is BuzYoo
   whatIsBizy: {
-    freelancerPerspective: "BiZZy is a revolutionary freelance platform designed to empower professionals with unlimited opportunities. Whether you're a developer, designer, writer, or marketer, BiZZy provides the perfect ecosystem to showcase your skills and connect with clients worldwide.",
-    clientPerspective: "For businesses and entrepreneurs, BiZZy offers instant access to a vetted pool of top talent. Our intelligent matching system ensures you find the perfect professional for your project, with transparent pricing and milestone-based payments for complete peace of mind."
+    freelancerPerspective: "BuzYoo is a revolutionary freelance platform designed to empower professionals with unlimited opportunities. Whether you're a developer, designer, writer, or marketer, BuzYoo provides the perfect ecosystem to showcase your skills and connect with clients worldwide.",
+    clientPerspective: "For businesses and entrepreneurs, BuzYoo offers instant access to a vetted pool of top talent. Our intelligent matching system ensures you find the perfect professional for your project, with transparent pricing and milestone-based payments for complete peace of mind."
   },
 
   // Key Benefits
@@ -89,7 +89,7 @@ export const BiZZyKnowledgeBase = {
 
   // Billing System
   billingSystem: {
-    title: "BiZZy Advanced Billing System",
+    title: "BuzYoo Advanced Billing System",
     description: "Secure, fast, and flexible payment processing with multi-currency support and AI-powered verification",
     
     features: [
@@ -287,8 +287,8 @@ export const BiZZyKnowledgeBase = {
   // Success Stories
   successStories: [
     {
-      quote: "BiZZy transformed my freelance career. Within 3 months, I went from struggling to find clients to having a full schedule with premium projects. The platform's intuitive design and quality clients make it stand out from the competition.",
-      author: "Sarah K., Graphic Designer (Top Rated on BiZZy)"
+      quote: "BuzYoo transformed my freelance career. Within 3 months, I went from struggling to find clients to having a full schedule with premium projects. The platform's intuitive design and quality clients make it stand out from the competition.",
+      author: "Sarah K., Graphic Designer (Top Rated on BuzYoo)"
     }
   ],
 
@@ -296,9 +296,9 @@ export const BiZZyKnowledgeBase = {
   faq: {
     "How do I get started?": "Create an account, complete your profile, and start browsing projects or posting jobs depending on whether you're a freelancer or client.",
     "What are the fees?": "Deposits have a 10% fee, cashouts have a 15% fee, and transactions have a 1.5% + $0.30 fee.",
-    "Is BiZZy secure?": "Yes, BiZZy uses bank-grade security with 256-bit encryption, PCI DSS compliance, and AI-powered fraud detection.",
+    "Is BuzYoo secure?": "Yes, BuzYoo uses bank-grade security with 256-bit encryption, PCI DSS compliance, and AI-powered fraud detection.",
     "How do payments work?": "Payments are processed securely through escrow protection with milestone-based payments for complete peace of mind.",
-    "What support is available?": "BiZZy offers 24/7 support through live chat, email, help center, and community forum with response times ranging from 2-24 hours depending on your plan."
+    "What support is available?": "BuzYoo offers 24/7 support through live chat, email, help center, and community forum with response times ranging from 2-24 hours depending on your plan."
   }
 };
 
