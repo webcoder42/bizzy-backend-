@@ -15,6 +15,7 @@ import {
   updateApplicationStatus,
   updateJobPost,
 } from "../Controller.js/PostProjectController.js";
+import { getProjectsByClient } from "../Controller.js/ClientProjectsController.js";
 
 const router = express.Router();
 
@@ -59,5 +60,7 @@ router.put(
 );
 
 router.get("/applicant/:id", requireSignIn, getApplicantDetails);
+
+router.get("/client-projects/:clientId", getProjectsByClient);
 
 export default router;
