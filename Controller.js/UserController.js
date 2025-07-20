@@ -6,6 +6,7 @@ import { OAuth2Client } from "google-auth-library";
 import nodemailer from "nodemailer";
 import UserModel from "../Model/UserModel.js";
 import sanitize from "mongo-sanitize";
+import { v4 as uuidv4 } from "uuid";
 /* 
 =============================================
 REGISTRATION-SPECIFIC UTILITIES AND STORAGE
@@ -196,14 +197,18 @@ export const sendRegistrationVerification = async (req, res) => {
         message: "User already exists with this email or username",
       });
     }
-    const existingDevice = await UserModel.findOne({
-      deviceId: req.body.deviceId,
-    });
-    if (existingDevice) {
-      return res.status(400).json({
-        success: false,
-        message: "A user is already registered from this device",
+
+    // Only check for existing device if deviceId is provided and not empty
+    if (req.body.deviceId) {
+      const existingDevice = await UserModel.findOne({
+        deviceId: req.body.deviceId,
       });
+      if (existingDevice) {
+        return res.status(400).json({
+          success: false,
+          message: "A user is already registered from this device",
+        });
+      }
     }
 
     // Generate and store verification code
@@ -563,13 +568,12 @@ export const verifyLoginCode = async (req, res) => {
     const userResponse = {
       _id: user._id,
       Fullname: user.Fullname,
-      username: user.username,
       email: user.email,
+      username: user.username,
+      profileImage: user.profileImage,
       role: user.role,
       UserType: user.UserType,
-      profileImage: user.profileImage,
       isVerified: user.isVerified,
-      createdAt: user.createdAt,
     };
 
     // Clean up
@@ -649,6 +653,7 @@ export const googleRegister = async (req, res) => {
     role = "user",
     UserType = "freelancer",
     referredBy,
+    deviceId,
   } = req.body;
 
   try {
@@ -678,15 +683,16 @@ export const googleRegister = async (req, res) => {
         message: "User already exists. Please login instead.",
       });
     }
-    const existingDevice = await UserModel.findOne({
-      deviceId: req.body.deviceId,
-    });
-
-    if (existingDevice) {
-      return res.status(400).json({
-        success: false,
-        message: "A user is already registered from this device",
+    if (deviceId) {
+      const existingDevice = await UserModel.findOne({
+        deviceId: deviceId,
       });
+      if (existingDevice) {
+        return res.status(400).json({
+          success: false,
+          message: "A user is already registered from this device",
+        });
+      }
     }
     // Create new user
     const referralCode = generateReferralCode();
@@ -702,7 +708,7 @@ export const googleRegister = async (req, res) => {
       role,
       UserType,
       isVerified: true,
-      deviceId: req.body.deviceId,
+      deviceId: deviceId,
     });
 
     await newUser.save();
@@ -939,6 +945,11 @@ export const updateUserProfile = async (req, res) => {
     const userId = req.user.id;
     const updates = req.body;
 
+    // Debug log for portfolio
+    if (updates.portfolio) {
+      console.log('Received portfolio for update:', JSON.stringify(updates.portfolio, null, 2));
+    }
+
     // Remove restricted fields
     delete updates.password;
     delete updates.role;
@@ -1126,13 +1137,25 @@ export const getAllUsers = async (req, res) => {
       .skip((page - 1) * limit)
       .exec();
 
+    // Calculate total add fund for each user
+    const usersWithAddFund = users.map(user => {
+      let totalAddFund = 0;
+      if (user.addFundLogs && user.addFundLogs.length > 0) {
+        totalAddFund = user.addFundLogs.reduce((sum, log) => sum + (log.amount || 0), 0);
+      }
+      // Convert to plain object and add totalAddFund
+      const userObj = user.toObject();
+      userObj.totalAddFund = totalAddFund;
+      return userObj;
+    });
+
     // Get total count for pagination info
     const count = await UserModel.countDocuments(query);
 
     return res.status(200).json({
       success: true,
       message: "Users retrieved successfully",
-      data: users,
+      data: usersWithAddFund,
       totalPages: Math.ceil(count / limit),
       currentPage: page,
       totalUsers: count,
@@ -1448,5 +1471,318 @@ export const getProfileCompletion = async (req, res) => {
       message: "Internal server error",
       error: error.message,
     });
+  }
+};
+
+/* 
+=============================================
+FORGOT PASSWORD CONTROLLERS
+=============================================
+*/
+
+// 1. Request password reset (send email with link)
+export const requestPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No user found with this email" });
+    }
+    // Generate token and expiry
+    const resetToken = uuidv4();
+    const resetExpires = Date.now() + 1000 * 60 * 15; // 15 min
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = resetExpires;
+    await user.save();
+    // Send email
+    const resetUrl = `${API_FRONTENT_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(
+      email
+    )}`;
+    // Use hardcoded credentials for testing
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "bizy83724@gmail.com",
+        pass: "ddrd kpnn ptjb zxnt",
+      },
+    });
+    const mailOptions = {
+      from: '"Password Reset" <bizy83724@gmail.com>',
+      to: email,
+      subject: "Reset your password",
+      html: `<div style="font-family:sans-serif;">
+        <h2>Password Reset Request</h2>
+        <p>Click the link below to reset your password. This link will expire in 15 minutes.</p>
+        <a href="${resetUrl}" style="color:blue;">Reset Password</a>
+        <p>If you did not request this, please ignore this email.</p>
+      </div>`,
+    };
+    await transporter.sendMail(mailOptions);
+    return res.status(200).json({
+      success: true,
+      message: "Password reset link sent to your email",
+    });
+  } catch (error) {
+    console.error("Request password reset error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// 2. Verify reset token (for frontend to check before showing reset form)
+export const verifyResetToken = async (req, res) => {
+  try {
+    const { email, token } = req.query;
+    if (!email || !token) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email and token are required" });
+    }
+    const user = await UserModel.findOne({ email, resetPasswordToken: token });
+    if (
+      !user ||
+      !user.resetPasswordExpires ||
+      user.resetPasswordExpires < Date.now()
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired reset token" });
+    }
+    return res.status(200).json({ success: true, message: "Token valid" });
+  } catch (error) {
+    console.error("Verify reset token error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// 3. Reset password (set new password)
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, token, newPassword } = req.body;
+    if (!email || !token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, token, and new password are required",
+      });
+    }
+    const user = await UserModel.findOne({ email, resetPasswordToken: token });
+    if (
+      !user ||
+      !user.resetPasswordExpires ||
+      user.resetPasswordExpires < Date.now()
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired reset token" });
+    }
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+    return res.status(200).json({
+      success: true,
+      message:
+        "Password reset successful. You can now login with your new password.",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// Get user projects and details
+export const getUserProjects = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+      });
+    }
+
+    // Get user details
+    const user = await UserModel.findById(userId).select(
+      "Fullname username email profileImage rating completedProjects totalEarnings totalSpend createdAt"
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Get user's projects (both completed and in-progress)
+    const PostProjectModel = (await import("../Model/PostProjectModel.js"))
+      .default;
+    const ProjectApplyModel = (await import("../Model/ProjectApplyModel.js"))
+      .default;
+
+    // Get projects where user is the client
+    const clientProjects = await PostProjectModel.find({
+      client: userId,
+      status: { $in: ["completed", "In-progress"] },
+    })
+      .select(
+        "title description budget status createdAt category skillsRequired"
+      )
+      .lean();
+
+    // Get projects where user is the freelancer (hired or completed)
+    const freelancerApplications = await ProjectApplyModel.find({
+      user: userId,
+      status: { $in: ["hired", "completed"] },
+    }).select("project rating feedback status");
+
+    const freelancerProjectIds = freelancerApplications.map(
+      (app) => app.project
+    );
+
+    // Map projectId to application for quick lookup
+    const appMap = {};
+    for (const app of freelancerApplications) {
+      if (app.project) appMap[app.project.toString()] = app;
+    }
+
+    let freelancerProjects = await PostProjectModel.find({
+      _id: { $in: freelancerProjectIds },
+    })
+      .select(
+        "title description budget status createdAt category skillsRequired"
+      )
+      .lean();
+
+    // Attach rating/feedback if project is completed and rating exists
+    freelancerProjects = freelancerProjects.map((proj) => {
+      const app = appMap[proj._id.toString()];
+      if (
+        proj.status === "completed" &&
+        app &&
+        (app.rating || app.feedback)
+      ) {
+        return {
+          ...proj,
+          freelancerRating: app.rating,
+          freelancerFeedback: app.feedback,
+        };
+      }
+      return proj;
+    });
+
+    // Combine and sort all projects
+    const projects = [...clientProjects, ...freelancerProjects].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    // Add full URL to profile image if it exists
+    if (user.profileImage && !user.profileImage.startsWith("http")) {
+      user.profileImage = `${process.env.BASE_URL || "http://localhost:8080"}${
+        user.profileImage
+      }`;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "User projects retrieved successfully",
+      data: {
+        user,
+        projects,
+        totalProjects: projects.length,
+        completedProjects: projects.filter((p) => p.status === "completed")
+          .length,
+        inProgressProjects: projects.filter((p) => p.status === "In-progress")
+          .length,
+      },
+    });
+  } catch (error) {
+    console.error("Get user projects error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve user projects",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+// Get total add fund amount (for admin dashboard)
+export const getTotalAddFundAmount = async (req, res) => {
+  try {
+    // Only admin can access
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Unauthorized: Only admins can access total add fund amount" });
+    }
+    // Aggregate sum of all addFundLogs.amount for all users
+    const users = await UserModel.find({}, "addFundLogs");
+    let totalAddFund = 0;
+    users.forEach(user => {
+      if (user.addFundLogs && user.addFundLogs.length > 0) {
+        user.addFundLogs.forEach(log => {
+          totalAddFund += log.amount || 0;
+        });
+      }
+    });
+    return res.status(200).json({ success: true, totalAddFund });
+  } catch (error) {
+    console.error("Error getting total add fund amount:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+};
+
+// Get monthly add fund amounts for the current year (for admin dashboard)
+export const getMonthlyAddFundAmounts = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Unauthorized: Only admins can access monthly add fund data" });
+    }
+    const year = new Date().getFullYear();
+    // Unwind addFundLogs and group by month
+    const result = await UserModel.aggregate([
+      { $unwind: "$addFundLogs" },
+      {
+        $match: {
+          "addFundLogs.date": {
+            $gte: new Date(`${year}-01-01T00:00:00.000Z`),
+            $lt: new Date(`${year + 1}-01-01T00:00:00.000Z`)
+          }
+        }
+      },
+      {
+        $group: {
+          _id: { $month: "$addFundLogs.date" },
+          totalAmount: { $sum: "$addFundLogs.amount" }
+        }
+      }
+    ]);
+    // Format result as array of 12 months
+    const monthly = Array(12).fill(0);
+    result.forEach(r => {
+      monthly[r._id - 1] = r.totalAmount;
+    });
+    return res.status(200).json({ success: true, monthly });
+  } catch (error) {
+    console.error("Error getting monthly add fund amounts:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
   }
 };

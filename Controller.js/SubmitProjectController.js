@@ -411,6 +411,49 @@ export const checkUserApprovedSubmissions = async (req, res) => {
   }
 };
 
+export const checkUserInProgressSubmissions = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    // Check if user exists
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    // Find all in-progress (submitted) submissions for this user
+    const inProgressSubmissions = await SubmitProjectModel.find({
+      user: userId,
+      status: "submitted",
+    })
+      .populate({
+        path: "project",
+        select: "title description budget",
+        model: PostProjectModel,
+      })
+      .populate({
+        path: "user",
+        select: "name email",
+        model: UserModel,
+      })
+      .sort({ submittedAt: -1 });
+    return res.status(200).json({
+      success: true,
+      message: "User in-progress project submissions",
+      count: inProgressSubmissions.length,
+      inProgressSubmissions,
+    });
+  } catch (err) {
+    console.error("❌ Error checking in-progress submissions:", err);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to check in-progress submissions",
+      details: err.message,
+    });
+  }
+};
+
 // Get Project Submission Details for Client
 export const getProjectSubmissionForClient = async (req, res) => {
   try {

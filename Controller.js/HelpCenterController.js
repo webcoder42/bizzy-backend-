@@ -10,9 +10,7 @@ export const submitComplaint = async (req, res) => {
     const userId = req.user.id;
     const issueType = sanitize(req.body.issueType);
     const description = sanitize(req.body.description);
-    const image = req.file
-      ? `complaints/${req.file.filename}` // Store relative path only
-      : null;
+    const image = req.body.image || null; // Accept base64 string directly
 
     // Validation
     if (!issueType || !description) {
@@ -42,7 +40,7 @@ export const submitComplaint = async (req, res) => {
       user: userId,
       issueType,
       description,
-      image,
+      image, // Store base64 string
     });
 
     // ✅ Fetch user

@@ -53,12 +53,19 @@ export const createBlog = async (req, res) => {
       image, // Thumbnail image URL
     } = req.body;
     const title = sanitize(req.body.title);
-    const tags = Array.isArray(req.body.tags) ? req.body.tags.map(tag => sanitize(tag)) : [];
+    const tags = Array.isArray(req.body.tags)
+      ? req.body.tags.map((tag) => sanitize(tag))
+      : [];
     const layoutType = sanitize(req.body.layoutType);
-    const content = Array.isArray(req.body.content) ? req.body.content.map(block => ({
-      type: sanitize(block.type),
-      value: sanitize(block.value)
-    })) : [];
+    const content = Array.isArray(req.body.content)
+      ? req.body.content.map((block) => ({
+          type: sanitize(block.type),
+          value: sanitize(block.value),
+        }))
+      : [];
+
+    // Debug log for content blocks
+    console.log('CREATE BLOG content blocks:', JSON.stringify(req.body.content, null, 2));
 
     // ✅ Validation (Enhanced)
     if (!title || title.trim().length === 0) {
@@ -133,12 +140,19 @@ export const updateBlog = async (req, res) => {
     const { id } = req.params;
     const image = req.body.image;
     const title = sanitize(req.body.title);
-    const tags = Array.isArray(req.body.tags) ? req.body.tags.map(tag => sanitize(tag)) : [];
+    const tags = Array.isArray(req.body.tags)
+      ? req.body.tags.map((tag) => sanitize(tag))
+      : [];
     const layoutType = sanitize(req.body.layoutType);
-    const content = Array.isArray(req.body.content) ? req.body.content.map(block => ({
-      type: sanitize(block.type),
-      value: sanitize(block.value)
-    })) : [];
+    const content = Array.isArray(req.body.content)
+      ? req.body.content.map((block) => ({
+          type: sanitize(block.type),
+          value: sanitize(block.value),
+        }))
+      : [];
+
+    // Debug log for content blocks
+    console.log('UPDATE BLOG content blocks:', JSON.stringify(req.body.content, null, 2));
 
     // Find blog first
     const blog = await BlogModel.findById(id);
@@ -240,22 +254,20 @@ export const deleteBlog = async (req, res) => {
 };
 
 // 🟢 Upload Image (Admin only)
+// Controller/BlogController.js
 export const uploadBlogImage = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No image file provided." });
     }
 
-    // Generate the URL for the uploaded image
-    const imageUrl = `${req.protocol}://${req.get(
-      "host"
-    )}/uploads/blog-images/${req.file.filename}`;
+    // Return the relative path instead of full URL
+    const imagePath = `/uploads/blog-images/${req.file.filename}`;
 
     res.status(200).json({
       success: true,
       message: "Image uploaded successfully!",
-      imageUrl,
-      filename: req.file.filename,
+      imageUrl: imagePath,
     });
   } catch (error) {
     console.error("Image upload error:", error);

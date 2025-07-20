@@ -7,6 +7,8 @@ import {
   submitProject,
   updateSubmissionStatus,
   getProjectSubmissionForClient,
+  checkUserApprovedSubmissions,
+  checkUserInProgressSubmissions,
 } from "../Controller.js/SubmitProjectController.js";
 
 const router = express.Router();
@@ -25,5 +27,11 @@ router.put("/project-update/:id", requireSignIn, updateSubmissionStatus);
 
 // New route for client to view project submission
 router.get("/client/submission/:projectId", requireSignIn, getProjectSubmissionForClient);
+
+// Route to get all approved submissions for a user
+router.get("/approved/:userId", checkUserApprovedSubmissions);
+
+// Route to get all in-progress submissions for a user
+router.get("/inprogress/:userId", checkUserInProgressSubmissions);
 
 export default router;

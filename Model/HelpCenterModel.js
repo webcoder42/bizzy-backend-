@@ -15,7 +15,7 @@ function generateTicketNumber() {
 const helpCenterTicketSchema = new Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
+    ref: "users",
     required: true,
   },
   ticketNumber: {
@@ -26,11 +26,15 @@ const helpCenterTicketSchema = new Schema({
   issueType: {
     type: String,
     enum: [
+      "Technical",
+      "Payment",
+      "Account",
+      "Feature Request",
+      "Other",
       "Cashout Delay",
       "Post Project Issue",
       "Fake Client",
       "Client Not Responding",
-      "Other",
     ],
     required: true,
   },

@@ -70,7 +70,7 @@ const getKnowledgeBasedResponse = (message) => {
     const platform = BiZZyKnowledgeBase.platform;
     const whatIs = BiZZyKnowledgeBase.whatIsBizy;
     return {
-      reply: `🎯 **What is BiZy?**\n\n${
+      reply: `🎯 **What is BuzYoo?**\n\n${
         platform.description
       }\n\n**For Freelancers:**\n${
         whatIs.freelancerPerspective
@@ -93,7 +93,7 @@ const getKnowledgeBasedResponse = (message) => {
   ) {
     const steps = BiZZyKnowledgeBase.howItWorks.steps;
     return {
-      reply: `🔄 **How BiZy Works:**\n\n${steps
+      reply: `🔄 **How BuzYoo Works:**\n\n${steps
         .map((step) => `${step.step}. **${step.title}** - ${step.description}`)
         .join("\n")}\n\n✨ It's that simple! Start your journey today.`,
       isKnowledgeBased: true,
@@ -106,7 +106,7 @@ const getKnowledgeBasedResponse = (message) => {
     searchTerm.includes("pricing")
   ) {
     const packages = BiZZyKnowledgeBase.packages;
-    let reply = `📦 **BiZy Packages & Plans:**\n\n**Freelancer Plans:**\n`;
+    let reply = `📦 **BuzYoo Packages & Plans:**\n\n**Freelancer Plans:**\n`;
 
     packages.freelancerPlans.forEach((plan) => {
       reply += `\n**${plan.name}** - ${plan.price}\n`;
@@ -135,7 +135,7 @@ const getKnowledgeBasedResponse = (message) => {
     const paymentMethods = BiZZyKnowledgeBase.paymentMethods;
 
     return {
-      reply: `💳 **BiZy Billing & Payment System:**\n\n**${billing.title}**\n${
+      reply: `💳 **BuzYoo Billing & Payment System:**\n\n**${billing.title}**\n${
         billing.description
       }\n\n**Key Features:**\n${billing.features
         .map(
@@ -158,7 +158,7 @@ const getKnowledgeBasedResponse = (message) => {
   ) {
     const support = BiZZyKnowledgeBase.support;
     return {
-      reply: `🆘 **BiZy Support & Help:**\n\n**Availability:** ${
+      reply: `🆘 **BuzYoo Support & Help:**\n\n**Availability:** ${
         support.availability
       }\n\n**Support Channels:**\n${support.channels
         .map((channel) => `• ${channel}`)
@@ -178,7 +178,7 @@ const getKnowledgeBasedResponse = (message) => {
   ) {
     const stats = BiZZyKnowledgeBase.statistics;
     return {
-      reply: `📊 **BiZy By The Numbers:**\n\n• Platform Uptime: ${stats.platformUptime}\n• Transactions Processed: ${stats.transactionsProcessed}\n• Faster Checkout: ${stats.fasterCheckout}\n• Countries Supported: ${stats.countriesSupported}\n• Conversion Rates: ${stats.conversionRates}\n• Lower Costs: ${stats.lowerCosts}\n\n🚀 These numbers speak for themselves!`,
+      reply: `📊 **BuzYoo By The Numbers:**\n\n• Platform Uptime: ${stats.platformUptime}\n• Transactions Processed: ${stats.transactionsProcessed}\n• Faster Checkout: ${stats.fasterCheckout}\n• Countries Supported: ${stats.countriesSupported}\n• Conversion Rates: ${stats.conversionRates}\n• Lower Costs: ${stats.lowerCosts}\n\n🚀 These numbers speak for themselves!`,
       isKnowledgeBased: true,
     };
   }
@@ -190,7 +190,7 @@ const getKnowledgeBasedResponse = (message) => {
   ) {
     const gettingStarted = BiZZyKnowledgeBase.gettingStarted;
     return {
-      reply: `🚀 **Getting Started with BiZy:**\n\n**For Freelancers:**\n${gettingStarted.freelancers
+      reply: `🚀 **Getting Started with BuzYoo:**\n\n**For Freelancers:**\n${gettingStarted.freelancers
         .map((step, index) => `${index + 1}. ${step}`)
         .join("\n")}\n\n**For Clients:**\n${gettingStarted.clients
         .map((step, index) => `${index + 1}. ${step}`)
@@ -207,7 +207,7 @@ const getKnowledgeBasedResponse = (message) => {
     const relevantResults = searchResults.slice(0, 3); // Get top 3 results
     let reply = `🔍 **Here's what I found about your query:**\n\n`;
     relevantResults.forEach((result, index) => {
-      reply += `${index + 1}. **${result.section}**: ${result.content.substring(
+      reply += `${index + 1}. **${result.section.replace(/BiZy|BiZZy|bizy/gi, 'BuzYoo')}**: ${result.content.substring(
         0,
         150
       )}...\n\n`;

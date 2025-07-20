@@ -12,14 +12,14 @@ export const getUserData = async (req, res) => {
       return res.status(200).json({
         taxDetails: [],
         payoutAccounts: [],
-        withdrawals: []
+        withdrawals: [],
       });
     }
 
     res.status(200).json({
       taxDetails: userData.taxDetails || [],
       payoutAccounts: userData.payoutAccounts || [],
-      withdrawals: userData.withdrawals || []
+      withdrawals: userData.withdrawals || [],
     });
   } catch (error) {
     console.error("Get user data error:", error);
@@ -33,7 +33,7 @@ export const getPayoutSummary = async (req, res) => {
     const userId = req.user.id;
 
     // Get user's total earnings
-    const user = await UserModel.findById(userId).select('totalEarnings');
+    const user = await UserModel.findById(userId).select("totalEarnings");
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -44,14 +44,17 @@ export const getPayoutSummary = async (req, res) => {
 
     // Calculate totals
     const totalPayout = withdrawals.reduce((sum, withdrawal) => {
-      if (withdrawal.status === 'paid') {
+      if (withdrawal.status === "paid") {
         return sum + withdrawal.amount;
       }
       return sum;
     }, 0);
 
     const pendingPayout = withdrawals.reduce((sum, withdrawal) => {
-      if (withdrawal.status === 'pending' || withdrawal.status === 'processing') {
+      if (
+        withdrawal.status === "pending" ||
+        withdrawal.status === "processing"
+      ) {
         return sum + withdrawal.amount;
       }
       return sum;
@@ -63,7 +66,10 @@ export const getPayoutSummary = async (req, res) => {
     currentMonth.setHours(0, 0, 0, 0);
 
     const thisMonthPayout = withdrawals.reduce((sum, withdrawal) => {
-      if (withdrawal.status === 'paid' && new Date(withdrawal.processedAt) >= currentMonth) {
+      if (
+        withdrawal.status === "paid" &&
+        new Date(withdrawal.processedAt) >= currentMonth
+      ) {
         return sum + withdrawal.amount;
       }
       return sum;
@@ -74,7 +80,8 @@ export const getPayoutSummary = async (req, res) => {
       totalPayout,
       thisMonthPayout,
       pendingPayout,
-      availableForWithdrawal: (user.totalEarnings || 0) - totalPayout - pendingPayout
+      availableForWithdrawal:
+        (user.totalEarnings || 0) - totalPayout - pendingPayout,
     });
   } catch (error) {
     console.error("Get payout summary error:", error);
@@ -90,8 +97,8 @@ export const requestWithdrawal = async (req, res) => {
 
     // Validate amount
     if (!amount || amount < 500) {
-      return res.status(400).json({ 
-        error: "Minimum withdrawal amount is $500" 
+      return res.status(400).json({
+        error: "Minimum withdrawal amount is $500",
       });
     }
 
@@ -109,47 +116,53 @@ export const requestWithdrawal = async (req, res) => {
 
     // Check if user has tax details
     if (!payoutData.taxDetails || payoutData.taxDetails.length === 0) {
-      return res.status(400).json({ 
-        error: "Please submit your tax details before requesting withdrawal" 
+      return res.status(400).json({
+        error: "Please submit your tax details before requesting withdrawal",
       });
     }
 
     // Check if user has connected accounts
     if (!payoutData.payoutAccounts || payoutData.payoutAccounts.length === 0) {
-      return res.status(400).json({ 
-        error: "Please connect a bank account before requesting withdrawal" 
+      return res.status(400).json({
+        error: "Please connect a bank account before requesting withdrawal",
       });
     }
 
     // Validate account index
     const accountIdx = parseInt(accountIndex);
     if (accountIdx < 0 || accountIdx >= payoutData.payoutAccounts.length) {
-      return res.status(400).json({ 
-        error: "Invalid account selected" 
+      return res.status(400).json({
+        error: "Invalid account selected",
       });
     }
 
     // Calculate total already withdrawn and pending
     const totalWithdrawn = payoutData.withdrawals.reduce((sum, withdrawal) => {
-      if (withdrawal.status === 'paid') {
+      if (withdrawal.status === "paid") {
         return sum + withdrawal.amount;
       }
       return sum;
     }, 0);
 
     const totalPending = payoutData.withdrawals.reduce((sum, withdrawal) => {
-      if (withdrawal.status === 'pending' || withdrawal.status === 'processing') {
+      if (
+        withdrawal.status === "pending" ||
+        withdrawal.status === "processing"
+      ) {
         return sum + withdrawal.amount;
       }
       return sum;
     }, 0);
 
-    const availableForWithdrawal = user.totalEarnings - totalWithdrawn - totalPending;
+    const availableForWithdrawal =
+      user.totalEarnings - totalWithdrawn - totalPending;
 
     // Check if user has enough balance
     if (amount > availableForWithdrawal) {
-      return res.status(400).json({ 
-        error: `Insufficient balance. Available for withdrawal: $${availableForWithdrawal.toFixed(2)}` 
+      return res.status(400).json({
+        error: `Insufficient balance. Available for withdrawal: $${availableForWithdrawal.toFixed(
+          2
+        )}`,
       });
     }
 
@@ -162,10 +175,10 @@ export const requestWithdrawal = async (req, res) => {
       amount: amount,
       netAmount: netAmount,
       taxAmount: taxAmount,
-      status: 'pending',
+      status: "pending",
       requestedAt: new Date(),
       accountIndex: accountIdx,
-      accountDetails: payoutData.payoutAccounts[accountIdx]
+      accountDetails: payoutData.payoutAccounts[accountIdx],
     };
 
     payoutData.withdrawals.push(withdrawalRequest);
@@ -178,10 +191,9 @@ export const requestWithdrawal = async (req, res) => {
         requestedAmount: amount,
         taxAmount: taxAmount,
         netAmount: netAmount,
-        availableBalance: availableForWithdrawal - amount
-      }
+        availableBalance: availableForWithdrawal - amount,
+      },
     });
-
   } catch (error) {
     console.error("Request withdrawal error:", error);
     res.status(500).json({ error: "Internal Server Error" });
@@ -199,12 +211,12 @@ export const getWithdrawalHistory = async (req, res) => {
     }
 
     // Sort withdrawals by requestedAt (newest first)
-    const sortedWithdrawals = payoutData.withdrawals.sort((a, b) => 
-      new Date(b.requestedAt) - new Date(a.requestedAt)
+    const sortedWithdrawals = payoutData.withdrawals.sort(
+      (a, b) => new Date(b.requestedAt) - new Date(a.requestedAt)
     );
 
     res.status(200).json({
-      withdrawals: sortedWithdrawals
+      withdrawals: sortedWithdrawals,
     });
   } catch (error) {
     console.error("Get withdrawal history error:", error);
@@ -228,9 +240,9 @@ export const cancelWithdrawal = async (req, res) => {
       return res.status(404).json({ error: "Withdrawal request not found" });
     }
 
-    if (withdrawal.status !== 'pending') {
-      return res.status(400).json({ 
-        error: "Only pending withdrawal requests can be cancelled" 
+    if (withdrawal.status !== "pending") {
+      return res.status(400).json({
+        error: "Only pending withdrawal requests can be cancelled",
       });
     }
 
@@ -239,9 +251,8 @@ export const cancelWithdrawal = async (req, res) => {
     await payoutData.save();
 
     res.status(200).json({
-      message: "Withdrawal request cancelled successfully"
+      message: "Withdrawal request cancelled successfully",
     });
-
   } catch (error) {
     console.error("Cancel withdrawal error:", error);
     res.status(500).json({ error: "Internal Server Error" });
@@ -373,12 +384,12 @@ export const getConnectedAccounts = async (req, res) => {
 
     if (!userData) {
       return res.status(200).json({
-        payoutAccounts: []
+        payoutAccounts: [],
       });
     }
 
     res.status(200).json({
-      payoutAccounts: userData.payoutAccounts || []
+      payoutAccounts: userData.payoutAccounts || [],
     });
   } catch (error) {
     console.error("Get connected accounts error:", error);
@@ -395,12 +406,12 @@ export const getTaxDetails = async (req, res) => {
 
     if (!userData) {
       return res.status(200).json({
-        taxDetails: []
+        taxDetails: [],
       });
     }
 
     res.status(200).json({
-      taxDetails: userData.taxDetails || []
+      taxDetails: userData.taxDetails || [],
     });
   } catch (error) {
     console.error("Get tax details error:", error);
@@ -435,7 +446,7 @@ export const deleteConnectedAccount = async (req, res) => {
 
     res.status(200).json({
       message: "Account deleted successfully.",
-      payoutAccounts: userData.payoutAccounts
+      payoutAccounts: userData.payoutAccounts,
     });
   } catch (error) {
     console.error("Delete connected account error:", error);

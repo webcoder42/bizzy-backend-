@@ -15,7 +15,6 @@ const router = express.Router();
 router.post(
   "/submit",
   requireSignIn, // User must be logged in
-  uploadImage.single("image"),
   submitComplaint
 );
 router.get("/complaints", requireSignIn, getUserComplaints);

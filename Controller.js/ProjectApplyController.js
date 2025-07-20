@@ -444,3 +444,23 @@ export const checkIfUserApplied = async (req, res) => {
     });
   }
 };
+
+// ADMIN: Delete a specific applicant's proposal from a project
+export const deleteApplicantProposalAdmin = async (req, res) => {
+  try {
+    const { projectId, applicantId } = req.params;
+    await ProjectApplyModel.findOneAndDelete({
+      project: projectId,
+      user: applicantId,
+    });
+    res.status(200).json({
+      success: true,
+      message: "Applicant's proposal deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

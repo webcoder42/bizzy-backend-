@@ -9,6 +9,7 @@ import {
   getUserById,
   getUserCompleteDetails,
   getUserProfile,
+  getUserProjects,
   googleLogin,
   googleRegister,
   initiateLogin,
@@ -20,6 +21,11 @@ import {
   verifyLoginCode,
   verifyRegistrationEmail,
   getProfileCompletion,
+  requestPasswordReset,
+  verifyResetToken,
+  resetPassword,
+  getTotalAddFundAmount,
+  getMonthlyAddFundAmounts,
 } from "../Controller.js/UserController.js";
 import { loginLimiter } from "./../middleware/rateLimiter.js";
 import { isAdmin, requireSignIn } from "./../middleware/UserMiddleware.js";
@@ -99,4 +105,20 @@ router.put("/update/:id", requireSignIn, isAdmin, updateUserById);
 router.delete("/delete/:id", requireSignIn, isAdmin, deleteUserById);
 
 router.get("/user/details/:id", getUserCompleteDetails);
+
+// Get user projects and details
+router.get("/user-projects/:userId", requireSignIn, getUserProjects);
+
+/* 
+=============================================
+FORGOT PASSWORD ROUTES
+=============================================
+*/
+router.post("/forgot-password/request", requestPasswordReset);
+router.get("/forgot-password/verify", verifyResetToken);
+router.post("/forgot-password/reset", resetPassword);
+
+router.get("/total-add-fund", requireSignIn, isAdmin, getTotalAddFundAmount);
+router.get("/monthly-add-fund", requireSignIn, isAdmin, getMonthlyAddFundAmounts);
+
 export default router;

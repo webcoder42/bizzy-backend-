@@ -506,7 +506,7 @@ export const getApplicantsForProject = async (req, res) => {
       .populate({
         path: "user",
         select:
-          "username email profileImage completedProjects rating plan maxProjectPerDay",
+          "username email profileImage completedProjects rating plan maxProjectPerDay socialLinks",
       })
       .populate({
         path: "IsPlanActive",
@@ -814,6 +814,57 @@ export const getLatestJobPosts = async (req, res) => {
       success: false,
       message: "Failed to fetch latest job posts",
       error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+// ADMIN: Get all projects with applicants
+export const getAllProjectsWithApplicantsAdmin = async (req, res) => {
+  try {
+    const projects = await PostProjectModel.find()
+      .populate("client", "username email")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const projectsWithApplicants = await Promise.all(
+      projects.map(async (project) => {
+        const applicants = await ProjectApplyModel.find({ project: project._id })
+          .populate("user", "username email")
+          .lean();
+        return {
+          ...project,
+          applicants,
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "All projects with applicants fetched successfully",
+      data: projectsWithApplicants,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ADMIN: Delete a project and all its applicants
+export const deleteProjectAndApplicantsAdmin = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    await ProjectApplyModel.deleteMany({ project: projectId });
+    await PostProjectModel.findByIdAndDelete(projectId);
+    res.status(200).json({
+      success: true,
+      message: "Project and all its applicants deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
 };

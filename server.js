@@ -1,4 +1,3 @@
-// server.js
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -42,39 +41,58 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Socket.IO
+// ✅ Allowed origins for CORS
+const allowedOrigins = ["http://localhost:3000", "https://bizzyy.netlify.app"];
+
+// ✅ Socket.IO with dynamic CORS
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "https://bizzyy.netlify.app/",
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Socket.IO CORS blocked."));
+      }
+    },
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
 setupSocketIO(io);
 
-// Middleware
+// ✅ CORS Middleware
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "https://bizzyy.netlify.app/",
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
-app.use(express.json({ limit: "10kb" }));
+
+// Middleware
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(cookieParser());
 app.use(helmet());
 app.use(hpp());
 app.use(xss());
 app.use(morgan("dev"));
 
-// 🧹 CSRF Middleware Removed Here
-// ❌ app.use(csrf({ cookie: true }));
-// ❌ app.use("/api/v1/users/get-csrf-token", ... );
-
 // Uploads folder setup
 const uploadsDir = path.join(__dirname, "uploads");
 const cvsDir = path.join(uploadsDir, "cvs");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 if (!fs.existsSync(cvsDir)) fs.mkdirSync(cvsDir, { recursive: true });
+// Allow CORS for static files
+app.use("/uploads", (req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  next();
+});
 app.use("/uploads", express.static(uploadsDir));
 app.get("/uploads/cvs/:filename", (req, res) => {
   const { filename } = req.params;
@@ -102,7 +120,7 @@ app.get("/", (req, res) => {
   res.send("Welcome to BiZZy");
 });
 
-// Server start
+// Start server
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);

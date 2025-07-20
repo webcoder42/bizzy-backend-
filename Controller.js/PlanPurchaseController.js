@@ -291,6 +291,14 @@ export const addFunds = async (req, res) => {
       // Update user totalEarnings with 90% of the amount
       const amountToAdd = amount * 0.9; // 90% of the amount
       user.totalEarnings = (user.totalEarnings || 0) + amountToAdd;
+      // Push add fund log object
+      user.addFundLogs = user.addFundLogs || [];
+      user.addFundLogs.push({
+        amount: amount,
+        credited: amountToAdd,
+        date: new Date(),
+        note: "",
+      });
       await user.save();
 
       return res.status(200).json({
@@ -492,5 +500,109 @@ export const getMyTeamPlans = async (req, res) => {
       message: "Internal server error while fetching purchased team plans",
       error: err.message,
     });
+  }
+};
+
+// Get total plan purchase amount (for admin dashboard)
+export const getTotalPlanPurchaseAmount = async (req, res) => {
+  try {
+    // Only admin can access
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Unauthorized: Only admins can access total purchase amount" });
+    }
+    // Sum all plan purchases' amount
+    const result = await PlanPurchaseModel.aggregate([
+      { $group: { _id: null, totalAmount: { $sum: "$amount" } } }
+    ]);
+    const totalAmount = result.length > 0 ? result[0].totalAmount : 0;
+    return res.status(200).json({ success: true, totalAmount });
+  } catch (error) {
+    console.error("Error getting total plan purchase amount:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+};
+
+// Get monthly plan purchase amounts for all years (for admin dashboard)
+export const getMonthlyPlanPurchaseAmounts = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Unauthorized: Only admins can access monthly purchase data" });
+    }
+    // Aggregate all purchases grouped by year and month
+    const result = await PlanPurchaseModel.aggregate([
+      {
+        $group: {
+          _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+          totalAmount: { $sum: "$amount" }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]);
+    // Find earliest and latest year
+    const years = result.map(r => r._id.year);
+    const uniqueYears = [...new Set(years)].sort();
+    // Build a map: { [year]: [12 months array] }
+    const data = {};
+    uniqueYears.forEach(year => {
+      data[year] = Array(12).fill(0);
+    });
+    result.forEach(r => {
+      data[r._id.year][r._id.month - 1] = r.totalAmount;
+    });
+    return res.status(200).json({ success: true, data, years: uniqueYears });
+  } catch (error) {
+    console.error("Error getting monthly plan purchase amounts:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+};
+
+// Get all-time monthly plan purchase amounts using submittedAt
+export const getAllTimeMonthlyPurchases = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Unauthorized: Only admins can access monthly purchase data" });
+    }
+    // Aggregate all purchases grouped by year and month using submittedAt
+    const result = await PlanPurchaseModel.aggregate([
+      {
+        $group: {
+          _id: { year: { $year: "$submittedAt" }, month: { $month: "$submittedAt" } },
+          totalAmount: { $sum: "$amount" }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]);
+    // Find earliest and latest year
+    const years = result.map(r => r._id.year);
+    const uniqueYears = [...new Set(years)].sort();
+    // Build a map: { [year]: [12 months array] }
+    const data = {};
+    uniqueYears.forEach(year => {
+      data[year] = Array(12).fill(0);
+    });
+    result.forEach(r => {
+      data[r._id.year][r._id.month - 1] = r.totalAmount;
+    });
+    return res.status(200).json({ success: true, data, years: uniqueYears });
+  } catch (error) {
+    console.error("Error getting all-time monthly plan purchase amounts:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+};
+
+// Get all plan purchases (admin only)
+export const getAllPlanPurchases = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Unauthorized: Only admins can access all purchases" });
+    }
+    const purchases = await PlanPurchaseModel.find()
+      .populate({ path: "user", select: "email Fullname name" })
+      .populate({ path: "plan", select: "name price" })
+      .sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, data: purchases });
+  } catch (error) {
+    console.error("Error getting all plan purchases:", error);
+    return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
   }
 };

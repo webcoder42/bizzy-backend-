@@ -14,7 +14,11 @@ import {
   searchJobPosts,
   updateApplicationStatus,
   updateJobPost,
+  getAllProjectsWithApplicantsAdmin,
+  deleteProjectAndApplicantsAdmin,
 } from "../Controller.js/PostProjectController.js";
+import { deleteApplicantProposalAdmin } from "../Controller.js/ProjectApplyController.js";
+import { getProjectsByClient } from "../Controller.js/ClientProjectsController.js";
 
 const router = express.Router();
 
@@ -59,5 +63,16 @@ router.put(
 );
 
 router.get("/applicant/:id", requireSignIn, getApplicantDetails);
+
+router.get("/client-projects/:clientId", getProjectsByClient);
+
+// ADMIN: Get all projects with applicants
+router.get("/admin/all-projects", getAllProjectsWithApplicantsAdmin);
+
+// ADMIN: Delete a project and all its applicants
+router.delete("/admin/project/:id", deleteProjectAndApplicantsAdmin);
+
+// ADMIN: Delete a specific applicant's proposal from a project
+router.delete("/admin/project/:projectId/applicant/:applicantId", deleteApplicantProposalAdmin);
 
 export default router;
