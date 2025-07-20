@@ -17,7 +17,10 @@ import {
   getAllProjectsWithApplicantsAdmin,
   deleteProjectAndApplicantsAdmin,
 } from "../Controller.js/PostProjectController.js";
+<<<<<<< HEAD
 import { deleteApplicantProposalAdmin } from "../Controller.js/ProjectApplyController.js";
+=======
+>>>>>>> 25821b43cea07d824f555629a6d0c5f9704efee9
 import { getProjectsByClient } from "../Controller.js/ClientProjectsController.js";
 
 const router = express.Router();
@@ -66,6 +69,7 @@ router.get("/applicant/:id", requireSignIn, getApplicantDetails);
 
 router.get("/client-projects/:clientId", getProjectsByClient);
 
+<<<<<<< HEAD
 // ADMIN: Get all projects with applicants
 router.get("/admin/all-projects", getAllProjectsWithApplicantsAdmin);
 
@@ -75,4 +79,6 @@ router.delete("/admin/project/:id", deleteProjectAndApplicantsAdmin);
 // ADMIN: Delete a specific applicant's proposal from a project
 router.delete("/admin/project/:projectId/applicant/:applicantId", deleteApplicantProposalAdmin);
 
+=======
+>>>>>>> 25821b43cea07d824f555629a6d0c5f9704efee9
 export default router;

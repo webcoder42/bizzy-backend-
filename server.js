@@ -75,8 +75,12 @@ app.use(
 );
 
 // Middleware
+<<<<<<< HEAD
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+=======
+app.use(express.json({ limit: "10kb" }));
+>>>>>>> 25821b43cea07d824f555629a6d0c5f9704efee9
 app.use(cookieParser());
 app.use(helmet());
 app.use(hpp());
