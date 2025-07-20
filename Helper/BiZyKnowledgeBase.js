@@ -1,5 +1,5 @@
-  // BiZZy Knowledge Base - All important information from documentation
-// This file contains comprehensive information about BiZZy platform for the chatbot
+// BuzYoo Knowledge Base - All important information from documentation
+// This file contains comprehensive information about BuzYoo platform for the chatbot
 
 export const BiZZyKnowledgeBase = {
   // Platform Overview
@@ -51,7 +51,7 @@ export const BiZZyKnowledgeBase = {
     }
   ],
 
-  // How BiZZy Works
+  // How BuzYoo Works
   howItWorks: {
     steps: [
       {

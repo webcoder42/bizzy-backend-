@@ -1440,7 +1440,7 @@ export const getProfileCompletion = async (req, res) => {
           }
           break;
         case "phone":
-          if (user.phone && user.phone.number && user.phone.countryCode) {
+          if (user.phone && user.phone.number) {
             completionPercentage += weight;
           } else {
             missingFields.push("Phone Number");
@@ -1609,7 +1609,6 @@ export const resetPassword = async (req, res) => {
     });
   }
 };
-<<<<<<< HEAD
 
 // Get user projects and details
 export const getUserProjects = async (req, res) => {
@@ -1787,5 +1786,3 @@ export const getMonthlyAddFundAmounts = async (req, res) => {
     return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
   }
 };
-=======
->>>>>>> 25821b43cea07d824f555629a6d0c5f9704efee9

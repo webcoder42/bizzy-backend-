@@ -331,7 +331,7 @@ const userSchema = new mongoose.Schema(
       number: {
         type: String,
         // Optionally add simple validation for phone number format
-        // validate: { validator: v => /^\d{7,15}$/.test(v), message: 'Invalid phone number' },
+        // validate: { validator: v => /^\d{7,15}$/.test(v), message: 'Phone number length is not valid!' },
       },
       // countryCode removed
     },
