@@ -27,6 +27,7 @@ import TeamHubRoute from "./Route/TeamHubRoute.js";
 import PayoutRoute from "./Route/payoutRoutes.js";
 import BlogRoute from "./Route/BlogRoute.js";
 import QuizRoute from "./Route/QuizRoute.js";
+import SiteSettingsRoute from "./Route/SiteSettingsRoute.js";
 import { setupSocketIO } from "./Controller.js/MessageController.js";
 
 // __dirname for ES modules
@@ -114,6 +115,7 @@ app.use("/api/v1/teamhub", TeamHubRoute);
 app.use("/api/v1/payout", PayoutRoute);
 app.use("/api/v1/blog", BlogRoute);
 app.use("/api/v1/quiz", QuizRoute);
+app.use("/api/site-settings", SiteSettingsRoute);
 
 // Root
 app.get("/", (req, res) => {

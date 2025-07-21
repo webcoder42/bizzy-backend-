@@ -3,6 +3,31 @@ import UserModel from "../Model/UserModel.js";
 import ProjectApplyModel from "../Model/ProjectApplyModel.js";
 import nodemailer from "nodemailer";
 import SubmitProjectModel from "../Model/SubmitProjectModel.js";
+import dotenv from "dotenv";
+import SiteSettings from "../Model/SiteSettingsModel.js";
+// === Nodemailer Transporter ===
+dotenv.config();
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+// === Email Send Function ===
+const sendEmail = async (to, subject, html) => {
+  try {
+    await transporter.sendMail({
+      from: 'BiZy Freelancing <bizy83724@gmail.com>',
+      to,
+      subject,
+      html,
+    });
+  } catch (err) {
+    console.error("❌ Email sending failed:", err);
+  }
+};
 
 export const createJobPost = async (req, res) => {
   try {
@@ -49,8 +74,15 @@ export const createJobPost = async (req, res) => {
       });
     }
 
-    // Calculate service charge (10% of requestedBudget)
-    const serviceCharge = (requestedBudget * 10) / 100;
+    // Fetch dynamic postProjectTax from SiteSettings
+    let postProjectTax = 10; // fallback default
+    const settings = await SiteSettings.findOne();
+    if (settings && typeof settings.postProjectTax === 'number') {
+      postProjectTax = settings.postProjectTax;
+    }
+
+    // Calculate service charge (dynamic postProjectTax of requestedBudget)
+    const serviceCharge = (requestedBudget * postProjectTax) / 100;
     const finalBudgetForJob = requestedBudget - serviceCharge;
 
     // Create and save job post
@@ -83,6 +115,9 @@ export const createJobPost = async (req, res) => {
       success: true,
       message: "Job post created successfully",
       data: populatedJob,
+      taxPercent: postProjectTax,
+      serviceCharge,
+      finalBudgetForJob,
     });
   } catch (error) {
     console.error("Create job error:", error);
@@ -578,15 +613,6 @@ export const getApplicantsForProject = async (req, res) => {
   }
 };
 
-// Create transporter directly in the controller
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "bizy83724@gmail.com",
-    pass: "ddrd kpnn ptjb zxnt",
-  },
-});
-
 export const updateApplicationStatus = async (req, res) => {
   try {
     const { status, feedback } = req.body;
@@ -855,11 +881,67 @@ export const getAllProjectsWithApplicantsAdmin = async (req, res) => {
 export const deleteProjectAndApplicantsAdmin = async (req, res) => {
   try {
     const projectId = req.params.id;
+    // Fetch project and client
+    const project = await PostProjectModel.findById(projectId).populate("client", "email username profileImage");
+    if (!project) {
+      return res.status(404).json({ success: false, message: "Project not found" });
+    }
+    const client = project.client;
+    // Fetch all applicants
+    const applicants = await ProjectApplyModel.find({ project: projectId }).populate("user", "email username");
+
+    // Email to project owner (client)
+    const clientEmailHtml = `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;background:#fff;border-radius:10px;padding:32px 24px;box-shadow:0 2px 12px #0001;">
+        <div style="text-align:center;margin-bottom:24px;">
+          <img src='https://i.ibb.co/6bQ7QwM/logo512.png' alt='BiZy Logo' style='width:80px;height:80px;border-radius:16px;margin-bottom:8px;' />
+          <h2 style="color:#5a6bff;">Project Deleted by Admin</h2>
+        </div>
+        <p>Dear <b>${client.username || "User"}</b>,</p>
+        <p>Your project <b>"${project.title}"</b> has been <span style="color:#ff4d4f;font-weight:bold;">deleted</span> by the BiZy admin team.</p>
+        <p><b>Reason:</b> Your project was found to be against our policy or contained inappropriate wording.</p>
+        <ul style="color:#ff4d4f;font-weight:bold;">
+          <li>Your project has been removed from the platform.</li>
+          <li>Your payment for this project is lost.</li>
+          <li>This is a warning. Repeated violations may result in account suspension.</li>
+        </ul>
+        <p style="color:#ff4d4f;font-weight:bold;">Please avoid posting such projects or using inappropriate wording in the future.</p>
+        <p>For any questions, contact support.</p>
+        <br/>
+        <p style="color:#5a6bff;font-weight:bold;">BiZy Team</p>
+      </div>
+    `;
+    await sendEmail(client.email, `Your Project "${project.title}" Has Been Deleted`, clientEmailHtml);
+
+    // Email to all applicants
+    for (const app of applicants) {
+      const applicant = app.user;
+      const applicantEmailHtml = `
+        <div style="font-family:sans-serif;max-width:600px;margin:auto;background:#fff;border-radius:10px;padding:32px 24px;box-shadow:0 2px 12px #0001;">
+          <div style="text-align:center;margin-bottom:24px;">
+            <img src='https://i.ibb.co/6bQ7QwM/logo512.png' alt='BiZy Logo' style='width:80px;height:80px;border-radius:16px;margin-bottom:8px;' />
+            <h2 style="color:#5a6bff;">Application Deleted</h2>
+          </div>
+          <p>Dear <b>${applicant.username || "User"}</b>,</p>
+          <p>Your application for the project <b>"${project.title}"</b> has been <span style="color:#ff4d4f;font-weight:bold;">deleted</span> by the BiZy admin team.</p>
+          <p><b>Reason:</b> The project was removed due to policy violation or inappropriate wording. Your application is also removed.</p>
+          <ul style="color:#ff4d4f;font-weight:bold;">
+            <li>This is a warning. Repeated inappropriate behavior may result in account suspension.</li>
+          </ul>
+          <p style="color:#ff4d4f;font-weight:bold;">Please avoid using inappropriate wording in your applications.</p>
+          <br/>
+          <p style="color:#5a6bff;font-weight:bold;">BiZy Team</p>
+        </div>
+      `;
+      await sendEmail(applicant.email, `Your Application for "${project.title}" Has Been Deleted`, applicantEmailHtml);
+    }
+
+    // Delete all applicants and the project
     await ProjectApplyModel.deleteMany({ project: projectId });
     await PostProjectModel.findByIdAndDelete(projectId);
     res.status(200).json({
       success: true,
-      message: "Project and all its applicants deleted successfully",
+      message: "Project and all its applicants deleted successfully, notifications sent.",
     });
   } catch (error) {
     res.status(500).json({

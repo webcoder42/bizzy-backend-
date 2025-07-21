@@ -4,6 +4,32 @@ import ProjectApplyModel from "../Model/ProjectApplyModel.js";
 import UserModel from "../Model/UserModel.js";
 import PlanPurchaseModel from "../Model/PlanPurchaseModel.js";
 import sanitize from "mongo-sanitize";
+import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+
+dotenv.config();
+// === Nodemailer Transporter ===
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+// === Email Send Function ===
+const sendEmail = async (to, subject, html) => {
+  try {
+    await transporter.sendMail({
+      from: 'BiZy Freelancing <bizy83724@gmail.com>',
+      to,
+      subject,
+      html,
+    });
+  } catch (err) {
+    console.error("❌ Email sending failed:", err);
+  }
+};
 
 // Apply to a project
 
@@ -449,13 +475,40 @@ export const checkIfUserApplied = async (req, res) => {
 export const deleteApplicantProposalAdmin = async (req, res) => {
   try {
     const { projectId, applicantId } = req.params;
-    await ProjectApplyModel.findOneAndDelete({
-      project: projectId,
-      user: applicantId,
-    });
+    console.log("[DEBUG] projectId:", projectId, typeof projectId);
+    console.log("[DEBUG] applicantId:", applicantId, typeof applicantId);
+    // Fetch applicant and project
+    const application = await ProjectApplyModel.findOne({ project: projectId, user: applicantId }).populate("user", "email username").populate("project", "title");
+    console.log("[DEBUG] application found:", application);
+    if (!application) {
+      return res.status(404).json({ success: false, message: "Application not found" });
+    }
+    const applicant = application.user;
+    const project = application.project;
+    // Email to applicant
+    const applicantEmailHtml = `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;background:#fff;border-radius:10px;padding:32px 24px;box-shadow:0 2px 12px #0001;">
+        <div style="text-align:center;margin-bottom:24px;">
+          <img src='https://i.ibb.co/6bQ7QwM/logo512.png' alt='BiZy Logo' style='width:80px;height:80px;border-radius:16px;margin-bottom:8px;' />
+          <h2 style="color:#5a6bff;">Application Deleted</h2>
+        </div>
+        <p>Dear <b>${applicant.username || "User"}</b>,</p>
+        <p>Your application for the project <b>"${project.title}"</b> has been <span style="color:#ff4d4f;font-weight:bold;">deleted</span> by the BiZy admin team.</p>
+        <p><b>Reason:</b> Your application was found to contain inappropriate wording or violate our policy.</p>
+        <ul style="color:#ff4d4f;font-weight:bold;">
+          <li>This is a warning. Repeated inappropriate behavior may result in account suspension.</li>
+        </ul>
+        <p style="color:#ff4d4f;font-weight:bold;">Please avoid using inappropriate wording in your applications.</p>
+        <br/>
+        <p style="color:#5a6bff;font-weight:bold;">BiZy Team</p>
+      </div>
+    `;
+    await sendEmail(applicant.email, `Your Application for "${project.title}" Has Been Deleted`, applicantEmailHtml);
+    // Delete the application
+    await ProjectApplyModel.findOneAndDelete({ project: projectId, user: applicantId });
     res.status(200).json({
       success: true,
-      message: "Applicant's proposal deleted successfully",
+      message: "Applicant's proposal deleted successfully, notification sent",
     });
   } catch (error) {
     res.status(500).json({

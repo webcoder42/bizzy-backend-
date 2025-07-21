@@ -1,5 +1,6 @@
 import PayOutModel from "../Model/PayOutModel.js";
 import UserModel from "../Model/UserModel.js";
+import SiteSettings from "../Model/SiteSettingsModel.js";
 
 // Get user data (tax details and connected accounts)
 export const getUserData = async (req, res) => {
@@ -75,6 +76,13 @@ export const getPayoutSummary = async (req, res) => {
       return sum;
     }, 0);
 
+    // Fetch dynamic cashoutTax from SiteSettings
+    let cashoutTax = 10; // fallback default
+    const settings = await SiteSettings.findOne();
+    if (settings && typeof settings.cashoutTax === 'number') {
+      cashoutTax = settings.cashoutTax;
+    }
+
     res.status(200).json({
       totalEarnings: user.totalEarnings || 0,
       totalPayout,
@@ -82,6 +90,7 @@ export const getPayoutSummary = async (req, res) => {
       pendingPayout,
       availableForWithdrawal:
         (user.totalEarnings || 0) - totalPayout - pendingPayout,
+      cashoutTax, // send to frontend
     });
   } catch (error) {
     console.error("Get payout summary error:", error);
@@ -166,8 +175,15 @@ export const requestWithdrawal = async (req, res) => {
       });
     }
 
-    // Calculate tax (10%)
-    const taxAmount = amount * 0.1;
+    // Fetch dynamic cashoutTax from SiteSettings
+    let cashoutTax = 10; // fallback default
+    const settings = await SiteSettings.findOne();
+    if (settings && typeof settings.cashoutTax === 'number') {
+      cashoutTax = settings.cashoutTax;
+    }
+
+    // Calculate tax (dynamic)
+    const taxAmount = (amount * cashoutTax) / 100;
     const netAmount = amount - taxAmount;
 
     // Create withdrawal request
@@ -192,6 +208,7 @@ export const requestWithdrawal = async (req, res) => {
         taxAmount: taxAmount,
         netAmount: netAmount,
         availableBalance: availableForWithdrawal - amount,
+        cashoutTax, // send to frontend for confirmation
       },
     });
   } catch (error) {

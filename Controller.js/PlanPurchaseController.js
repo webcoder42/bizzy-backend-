@@ -6,6 +6,7 @@ import UserModel from "../Model/UserModel.js";
 import PlanPurchaseModel from "../Model/PlanPurchaseModel.js";
 import dotenv from "dotenv";
 dotenv.config();
+import SiteSettings from "../Model/SiteSettingsModel.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -273,6 +274,13 @@ export const addFunds = async (req, res) => {
     const user = await UserModel.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found." });
 
+    // Fetch dynamic addFundTax from SiteSettings
+    let addFundTax = 10; // fallback default
+    const settings = await SiteSettings.findOne();
+    if (settings && typeof settings.addFundTax === 'number') {
+      addFundTax = settings.addFundTax;
+    }
+
     // Create Stripe payment intent
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100), // cents
@@ -288,8 +296,8 @@ export const addFunds = async (req, res) => {
     });
 
     if (paymentIntent.status === "succeeded") {
-      // Update user totalEarnings with 90% of the amount
-      const amountToAdd = amount * 0.9; // 90% of the amount
+      // Update user totalEarnings with (100 - addFundTax)% of the amount
+      const amountToAdd = amount - (amount * addFundTax) / 100;
       user.totalEarnings = (user.totalEarnings || 0) + amountToAdd;
       // Push add fund log object
       user.addFundLogs = user.addFundLogs || [];
@@ -304,6 +312,9 @@ export const addFunds = async (req, res) => {
       return res.status(200).json({
         message: "Funds added successfully.",
         amountAdded: amountToAdd,
+        taxPercent: addFundTax,
+        taxAmount: (amount * addFundTax) / 100,
+        originalAmount: amount,
         receiptUrl: paymentIntent.charges?.data[0]?.receipt_url,
       });
     } else {
