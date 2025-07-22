@@ -1,5 +1,6 @@
 import express from "express";
 import { requireSignIn } from "./../middleware/UserMiddleware.js";
+import { isAdmin } from "./../middleware/UserMiddleware.js";
 import {
   connectPayoutAccount,
   submitTaxDetails,
@@ -11,6 +12,10 @@ import {
   requestWithdrawal,
   getWithdrawalHistory,
   cancelWithdrawal,
+  getAllWithdrawals,
+  updateWithdrawalStatus,
+  getWithdrawalStats,
+  deleteWithdrawal,
 } from "../Controller.js/PayOutController.js";
 
 const router = express.Router();
@@ -43,6 +48,37 @@ router.post("/request-withdrawal", requireSignIn, requestWithdrawal);
 router.delete("/withdrawals/:withdrawalId", requireSignIn, cancelWithdrawal);
 
 // Delete connected account
-router.delete("/connected-account/:accountIndex", requireSignIn, deleteConnectedAccount);
+router.delete(
+  "/connected-account/:accountIndex",
+  requireSignIn,
+  deleteConnectedAccount
+);
+
+// ADMIN: Get all withdrawals
+router.get("/admin/withdrawals", requireSignIn, isAdmin, getAllWithdrawals);
+
+// ADMIN: Get withdrawal stats
+router.get(
+  "/admin/withdrawals/stats",
+  requireSignIn,
+  isAdmin,
+  getWithdrawalStats
+);
+
+// ADMIN: Update withdrawal status
+router.put(
+  "/admin/withdrawals/:payoutId/:withdrawalId",
+  requireSignIn,
+  isAdmin,
+  updateWithdrawalStatus
+);
+
+// ADMIN: Delete withdrawal
+router.delete(
+  "/admin/withdrawals/:payoutId/:withdrawalId",
+  requireSignIn,
+  isAdmin,
+  deleteWithdrawal
+);
 
 export default router;

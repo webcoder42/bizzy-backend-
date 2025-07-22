@@ -79,7 +79,7 @@ export const getPayoutSummary = async (req, res) => {
     // Fetch dynamic cashoutTax from SiteSettings
     let cashoutTax = 10; // fallback default
     const settings = await SiteSettings.findOne();
-    if (settings && typeof settings.cashoutTax === 'number') {
+    if (settings && typeof settings.cashoutTax === "number") {
       cashoutTax = settings.cashoutTax;
     }
 
@@ -178,7 +178,7 @@ export const requestWithdrawal = async (req, res) => {
     // Fetch dynamic cashoutTax from SiteSettings
     let cashoutTax = 10; // fallback default
     const settings = await SiteSettings.findOne();
-    if (settings && typeof settings.cashoutTax === 'number') {
+    if (settings && typeof settings.cashoutTax === "number") {
       cashoutTax = settings.cashoutTax;
     }
 
@@ -468,5 +468,169 @@ export const deleteConnectedAccount = async (req, res) => {
   } catch (error) {
     console.error("Delete connected account error:", error);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+export const getAllWithdrawals = async (req, res) => {
+  try {
+    // Get all payouts with populated user data
+    const payouts = await PayOutModel.find().populate({
+      path: "user",
+      select: "username email Fullname profileImage",
+    });
+
+    // Extract and format withdrawals data
+    const withdrawals = payouts.flatMap((payout) =>
+      payout.withdrawals
+        .map((withdrawal) => ({
+          ...withdrawal.toObject(),
+          _id: withdrawal._id,
+          user: payout.user,
+          payoutId: payout._id,
+        }))
+        .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt))
+    );
+
+    res.status(200).json({
+      success: true,
+      withdrawals,
+    });
+  } catch (error) {
+    console.error("Get all withdrawals error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch withdrawals",
+    });
+  }
+};
+
+// ADMIN: Update withdrawal status
+// ADMIN: Update withdrawal status - Fixed version
+// Robust updateWithdrawalStatus controller
+export const updateWithdrawalStatus = async (req, res) => {
+  try {
+    const { payoutId, withdrawalId } = req.params;
+    const { status } = req.body;
+
+    // Validate IDs
+    if (!payoutId || !withdrawalId) {
+      return res.status(400).json({
+        success: false,
+        error: "Both payoutId and withdrawalId are required",
+      });
+    }
+
+    // Validate status
+    const validStatuses = ["pending", "processing", "paid", "rejected"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid status value",
+      });
+    }
+
+    const payout = await PayOutModel.findById(payoutId);
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        error: "Payout record not found",
+      });
+    }
+
+    const withdrawal = payout.withdrawals.id(withdrawalId);
+    if (!withdrawal) {
+      return res.status(404).json({
+        success: false,
+        error: "Withdrawal not found in this payout record",
+      });
+    }
+
+    // Update status
+    withdrawal.status = status;
+
+    // Set processedAt if status is paid
+    if (status === "paid" && !withdrawal.processedAt) {
+      withdrawal.processedAt = new Date();
+    }
+
+    await payout.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Withdrawal status updated successfully",
+      data: {
+        id: withdrawal._id,
+        status: withdrawal.status,
+        processedAt: withdrawal.processedAt,
+      },
+    });
+  } catch (error) {
+    console.error("Update withdrawal status error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to update withdrawal status",
+      details: error.message,
+    });
+  }
+};
+
+// ADMIN: Delete withdrawal
+export const deleteWithdrawal = async (req, res) => {
+  try {
+    const { payoutId, withdrawalId } = req.params;
+
+    const payout = await PayOutModel.findById(payoutId);
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        error: "Payout record not found",
+      });
+    }
+
+    // Remove the withdrawal
+    payout.withdrawals.pull(withdrawalId);
+    await payout.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Withdrawal deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete withdrawal error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete withdrawal",
+    });
+  }
+};
+
+// ADMIN: Get withdrawal stats
+export const getWithdrawalStats = async (req, res) => {
+  try {
+    const payouts = await PayOutModel.find().populate("user");
+
+    const allWithdrawals = payouts.flatMap((payout) => payout.withdrawals);
+
+    const stats = {
+      total: allWithdrawals.length,
+      pending: allWithdrawals.filter((w) => w.status === "pending").length,
+      processing: allWithdrawals.filter((w) => w.status === "processing")
+        .length,
+      paid: allWithdrawals.filter((w) => w.status === "paid").length,
+      rejected: allWithdrawals.filter((w) => w.status === "rejected").length,
+      totalAmount: allWithdrawals.reduce((sum, w) => sum + w.amount, 0),
+      totalTax: allWithdrawals.reduce((sum, w) => sum + w.taxAmount, 0),
+      totalNet: allWithdrawals.reduce((sum, w) => sum + w.netAmount, 0),
+    };
+
+    res.status(200).json({
+      success: true,
+      stats,
+    });
+  } catch (error) {
+    console.error("Get withdrawal stats error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to get withdrawal stats",
+    });
   }
 };
