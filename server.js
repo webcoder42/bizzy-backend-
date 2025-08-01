@@ -119,7 +119,7 @@ app.use("/api/site-settings", SiteSettingsRoute);
 
 // Root
 app.get("/", (req, res) => {
-  res.send("Welcome to BuzYoo");
+  res.send("Welcome to BiZZy");
 });
 
 // Start server

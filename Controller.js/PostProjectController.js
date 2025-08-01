@@ -41,32 +41,29 @@ export const createJobPost = async (req, res) => {
     const { 
       title, 
       description, 
+      experience,
+      problems,
+      bonus,
       budget, 
-      duration, 
       category, 
       skillsRequired,
-      projectRequirements,
-      clientExperience,
-      problemsFaced,
-      expectedOutcome
+      deadline
     } = req.body;
 
     // Validate required fields
     if (
       !title ||
       !description ||
+      !experience ||
+      !problems ||
       !budget ||
-      !duration ||
       !category ||
       !skillsRequired ||
-      !projectRequirements ||
-      !clientExperience ||
-      !problemsFaced ||
-      !expectedOutcome
+      !deadline
     ) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required",
+        message: "All required fields are required",
       });
     }
 
@@ -104,16 +101,15 @@ export const createJobPost = async (req, res) => {
       client: req.user.id,
       title,
       description,
+      experience,
+      problems,
+      bonus,
       budget: finalBudgetForJob,
-      duration,
       category,
       skillsRequired: Array.isArray(skillsRequired)
         ? skillsRequired
         : [skillsRequired],
-      projectRequirements,
-      clientExperience,
-      problemsFaced,
-      expectedOutcome,
+      deadline: new Date(deadline),
       status: "open",
     });
 

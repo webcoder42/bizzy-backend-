@@ -1,188 +1,81 @@
 import mongoose from "mongoose";
 
-const jobSchema = new mongoose.Schema({
-  client: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "users",
-    required: true,
-  },
-  title: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  description: {
-    type: String,
-    required: true,
-  },
-  budget: {
-    type: Number,
-    required: true,
-  },
-  duration: {
-    type: String,
-    required: true,
-  },
-  category: {
-    type: String,
-    enum: [
-      "Web Development",
-      "Mobile App Development",
-      "Graphic Design",
-      "Content Writing",
-      "SEO",
-      "Digital Marketing",
-      "Data Science",
-      "Virtual Assistant",
-      "Translation",
-      "Video Editing",
-      "UX/UI Design",
-      "Social Media Management",
-      "Customer Support",
-      "Software Development",
-      "QA Testing",
-      "Business Consulting",
-      "Artificial Intelligence",
-      "Machine Learning",
-      "Deep Learning",
-    ],
-    required: true,
-  },
-  skillsRequired: [
-    {
+const jobSchema = new mongoose.Schema(
+  {
+    title: {
       type: String,
+      required: true,
+      trim: true,
+    },
+    description: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    experience: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    problems: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    bonus: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    budget: {
+      type: Number,
+      required: true,
+    },
+    category: {
+      type: String,
+      required: true,
       enum: [
-        "JavaScript",
-        "Python",
-        "PHP",
-        "React",
-        "Node.js",
-        "Vue.js",
-        "Angular",
-        "React Native",
-        "Flutter",
-        "Swift",
-        "Java",
-        "Kotlin",
-        "HTML",
-        "CSS",
-        "WordPress",
-        "Shopify",
-        "SEO",
-        "Content Writing",
-        "Copywriting",
+        "Web Development",
+        "Mobile Development",
+        "UI/UX Design",
         "Graphic Design",
-        "Adobe Photoshop",
-        "Illustrator",
-        "After Effects",
-        "Video Editing",
-        "Social Media Marketing",
-        "Google Ads",
-        "Facebook Ads",
-        "Data Analysis",
-        "Machine Learning",
-        "AI",
-        "Sales",
-        "Customer Support",
-        "UX/UI Design",
-        "DevOps",
-        "Cybersecurity",
-        "Blockchain",
-        "MERN Stack",
+        "Content Writing",
+        "Digital Marketing",
         "Data Science",
+        "AI/ML",
+        "Blockchain",
         "Game Development",
-        "3D Modeling",
-        "Motion Graphics",
-        "Virtual Assistant",
-        "Translation",
-        "Voice Over",
-        "Accounting & Finance",
-        "Legal Consulting",
+        "Other",
       ],
+    },
+    skillsRequired: {
+      type: [String],
       required: true,
     },
-  ],
-
-  // Template fields for structured project requirements
-  projectRequirements: {
-    projectOverview: {
-      type: String,
+    deadline: {
+      type: Date,
       required: true,
-      trim: true,
     },
-    specificFeatures: {
-      type: String,
+    client: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "users",
       required: true,
-      trim: true,
     },
-    technicalRequirements: {
+    status: {
       type: String,
-      required: true,
-      trim: true,
+      enum: ["open", "in-progress", "completed", "cancelled"],
+      default: "open",
     },
-    designPreferences: {
-      type: String,
-      required: true,
-      trim: true,
+    createdAt: {
+      type: Date,
+      default: Date.now,
     },
-    targetAudience: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    competitors: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    timeline: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    budgetBreakdown: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    deliverables: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    successMetrics: {
-      type: String,
-      required: true,
-      trim: true,
+    updatedAt: {
+      type: Date,
+      default: Date.now,
     },
   },
-
-  // Experience and problem fields
-  clientExperience: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  problemsFaced: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  expectedOutcome: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-
-  status: {
-    type: String,
-    enum: ["open", "In-progress", "completed", "cancelled"],
-    default: "open",
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  { timestamps: true }
+);
 
 export default mongoose.model("ClientPostProject", jobSchema);
