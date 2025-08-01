@@ -16,6 +16,7 @@ import {
   updateJobPost,
   getAllProjectsWithApplicantsAdmin,
   deleteProjectAndApplicantsAdmin,
+  getRecommendedApplicants,
 } from "../Controller.js/PostProjectController.js";
 import { deleteApplicantProposalAdmin } from "../Controller.js/ProjectApplyController.js";
 import { getProjectsByClient } from "../Controller.js/ClientProjectsController.js";
@@ -56,6 +57,10 @@ router.get("/my-project-applicants", requireSignIn, getApplicantsForMyProjects);
 
 // Get applicants for a specific project (new route)
 router.get("/applicants/:projectId", requireSignIn, getApplicantsForProject);
+
+// Get recommended applicants for a specific project
+router.get("/recommended-applicants/:projectId", requireSignIn, getRecommendedApplicants);
+
 router.put(
   "/update-application/:applicationId",
   requireSignIn,

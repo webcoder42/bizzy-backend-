@@ -15,18 +15,8 @@ const submissionSchema = new mongoose.Schema(
     },
     submissionType: {
       type: String,
-      enum: ["github_link", "github_repo"],
+      enum: ["github_link", "github_repo", "both", "live_site"],
       required: [true, "Submission type is required"],
-      validate: {
-        validator: function (v) {
-          // Ensure corresponding fields exist based on type
-          if (v === "github_link") return !!this.githubLink;
-          if (v === "github_repo") return !!this.githubRepo;
-          return false;
-        },
-        message: (props) =>
-          `Submission type ${props.value} requires corresponding fields`,
-      },
     },
 
     // For direct GitHub link submission
@@ -34,14 +24,27 @@ const submissionSchema = new mongoose.Schema(
       type: String,
       validate: {
         validator: function (v) {
+          if (!v) return true; // Allow empty for optional field
           // Fixed regex for GitHub URL validation
           return /^https?:\/\/github\.com\/[^/]+\/[^/]+$/.test(v);
         },
         message: (props) =>
           `${props.value} is not a valid GitHub repository URL!`,
       },
-      required: function () {
-        return this.submissionType === "github_link";
+      trim: true,
+    },
+
+    // For live site URL
+    liveSiteUrl: {
+      type: String,
+      validate: {
+        validator: function (v) {
+          if (!v) return true; // Allow empty for optional field
+          // Basic URL validation
+          return /^https?:\/\/.+/.test(v);
+        },
+        message: (props) =>
+          `${props.value} is not a valid URL!`,
       },
       trim: true,
     },
@@ -93,7 +96,6 @@ const submissionSchema = new mongoose.Schema(
 
     description: {
       type: String,
-
       trim: true,
     },
 
@@ -136,6 +138,16 @@ const submissionSchema = new mongoose.Schema(
     toObject: { virtuals: true },
   }
 );
+
+// Custom validation to ensure at least one link is provided
+submissionSchema.pre('save', function(next) {
+  if (this.submissionType === "github_link" || this.submissionType === "both" || this.submissionType === "live_site") {
+    if (!this.githubLink && !this.liveSiteUrl) {
+      return next(new Error('At least one link (GitHub or Live Site) is required'));
+    }
+  }
+  next();
+});
 
 const SubmitProjectModel = mongoose.model("SubmitProject", submissionSchema);
 export default SubmitProjectModel;

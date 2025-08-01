@@ -10,6 +10,15 @@ const chatSchema = new mongoose.Schema({
   response: { type: String },
   userEmail: { type: String },
   username: { type: String },
+  isFinancial: { type: Boolean, default: false },
+  isKnowledgeBased: { type: Boolean, default: false },
+  isActionable: { type: Boolean, default: false },
+  actions: [{
+    type: { type: String, enum: ['link', 'button', 'email'] },
+    label: { type: String },
+    url: { type: String },
+    description: { type: String }
+  }],
   createdAt: { type: Date, default: Date.now },
 });
 

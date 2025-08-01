@@ -30,6 +30,7 @@ const sendEmail = async (to, subject, html) => {
 // 1. Submit or Update Project
 export const submitProject = async (req, res) => {
   const githubLink = sanitize(req.body.githubLink);
+  const liveSiteUrl = sanitize(req.body.liveSiteUrl);
   const description = sanitize(req.body.description);
   const userId = req.user?.id;
 
@@ -42,19 +43,41 @@ export const submitProject = async (req, res) => {
 
   const projectId = req.params.projectId;
 
-  if (!githubLink || !description) {
+  // Check if at least one link is provided
+  if (!githubLink && !liveSiteUrl) {
     return res.status(400).json({
       success: false,
-      error: "GitHub link and description are required",
+      error: "At least one link (GitHub or Live Site) is required",
     });
   }
 
-  const githubUrlRegex = /^https?:\/\/github\.com\/[^/]+\/[^/]+$/;
-  if (!githubUrlRegex.test(githubLink)) {
+  if (!description) {
     return res.status(400).json({
       success: false,
-      error: "Invalid GitHub URL",
+      error: "Description is required",
     });
+  }
+
+  // Validate GitHub URL if provided
+  if (githubLink) {
+    const githubUrlRegex = /^https?:\/\/github\.com\/[^/]+\/[^/]+$/;
+    if (!githubUrlRegex.test(githubLink)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid GitHub URL",
+      });
+    }
+  }
+
+  // Validate Live Site URL if provided
+  if (liveSiteUrl) {
+    const urlRegex = /^https?:\/\/.+/;
+    if (!urlRegex.test(liveSiteUrl)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid Live Site URL",
+      });
+    }
   }
 
   try {
@@ -73,12 +96,21 @@ export const submitProject = async (req, res) => {
     // Get submitter details
     const submitter = await UserModel.findById(userId, "name email");
 
+    // Determine submission type
+    let submissionType = "github_link";
+    if (githubLink && liveSiteUrl) {
+      submissionType = "both";
+    } else if (liveSiteUrl && !githubLink) {
+      submissionType = "live_site";
+    }
+
     // Create/update submission
     const submission = await SubmitProjectModel.findOneAndUpdate(
       { user: userId, project: projectId },
       {
-        submissionType: "github_link",
+        submissionType,
         githubLink,
+        liveSiteUrl,
         description,
         status: "submitted",
         submittedAt: new Date(),
@@ -86,13 +118,26 @@ export const submitProject = async (req, res) => {
       { new: true, upsert: true }
     );
 
+    // Prepare email content
+    let linksSection = "";
+    if (githubLink && liveSiteUrl) {
+      linksSection = `
+        <p><strong>GitHub Link:</strong> <a href="${githubLink}">${githubLink}</a></p>
+        <p><strong>Live Site URL:</strong> <a href="${liveSiteUrl}">${liveSiteUrl}</a></p>
+      `;
+    } else if (githubLink) {
+      linksSection = `<p><strong>GitHub Link:</strong> <a href="${githubLink}">${githubLink}</a></p>`;
+    } else {
+      linksSection = `<p><strong>Live Site URL:</strong> <a href="${liveSiteUrl}">${liveSiteUrl}</a></p>`;
+    }
+
     // 1. Email to Project Owner (Client)
     const ownerEmailContent = `
       <h2>New Project Submission</h2>
       <p>Hello</p>
       <p>You have received a new submission for your project <strong>${project.title}</strong>.</p>
-      <p><strong>Submitted by:</strong>  (${submitter.email})</p>
-      <p><strong>GitHub Link:</strong> <a href="${githubLink}">${githubLink}</a></p>
+      <p><strong>Submitted by:</strong> ${submitter.name} (${submitter.email})</p>
+      ${linksSection}
       <p><strong>Description:</strong> ${description}</p>
       <p>Please review the submission at your earliest convenience.</p>
       <p>Best regards,<br/>Your Project Team</p>
@@ -108,12 +153,11 @@ export const submitProject = async (req, res) => {
     const submitterEmailContent = `
       <h2>Your Project Submission Received</h2>
       <p>Hello ${submitter.name},</p>
-      <p>Your submission for project <strong>${
-        project.title
-      }</strong> has been successfully received.</p>
+      <p>Your submission for project <strong>${project.title}</strong> has been successfully received.</p>
       <p><strong>Submission Details:</strong></p>
       <ul>
-        <li><strong>GitHub Link:</strong> <a href="${githubLink}">${githubLink}</a></li>
+        ${githubLink ? `<li><strong>GitHub Link:</strong> <a href="${githubLink}">${githubLink}</a></li>` : ''}
+        ${liveSiteUrl ? `<li><strong>Live Site URL:</strong> <a href="${liveSiteUrl}">${liveSiteUrl}</a></li>` : ''}
         <li><strong>Description:</strong> ${description}</li>
         <li><strong>Submitted At:</strong> ${new Date().toLocaleString()}</li>
       </ul>

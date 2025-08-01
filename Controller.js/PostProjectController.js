@@ -38,8 +38,18 @@ export const createJobPost = async (req, res) => {
       });
     }
 
-    const { title, description, budget, duration, category, skillsRequired } =
-      req.body;
+    const { 
+      title, 
+      description, 
+      budget, 
+      duration, 
+      category, 
+      skillsRequired,
+      projectRequirements,
+      clientExperience,
+      problemsFaced,
+      expectedOutcome
+    } = req.body;
 
     // Validate required fields
     if (
@@ -48,7 +58,11 @@ export const createJobPost = async (req, res) => {
       !budget ||
       !duration ||
       !category ||
-      !skillsRequired
+      !skillsRequired ||
+      !projectRequirements ||
+      !clientExperience ||
+      !problemsFaced ||
+      !expectedOutcome
     ) {
       return res.status(400).json({
         success: false,
@@ -96,6 +110,10 @@ export const createJobPost = async (req, res) => {
       skillsRequired: Array.isArray(skillsRequired)
         ? skillsRequired
         : [skillsRequired],
+      projectRequirements,
+      clientExperience,
+      problemsFaced,
+      expectedOutcome,
       status: "open",
     });
 
@@ -123,7 +141,7 @@ export const createJobPost = async (req, res) => {
     console.error("Create job error:", error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Internal server error",
     });
   }
 };
@@ -947,6 +965,148 @@ export const deleteProjectAndApplicantsAdmin = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+// Get recommended applicants for a project
+export const getRecommendedApplicants = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    
+    if (!req.user?.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - Please login first",
+      });
+    }
+
+    // Get project details
+    const project = await PostProjectModel.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Get all applicants for this project
+    const applicants = await ProjectApplyModel.find({ project: projectId })
+      .populate('user', 'Fullname username email skills portfolio completedProjects rating bio UserType')
+      .populate('IsPlanActive');
+
+    if (!applicants || applicants.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        message: "No applicants found"
+      });
+    }
+
+    // Calculate recommendation scores for each applicant
+    const scoredApplicants = applicants.map(applicant => {
+      let score = 0;
+      const user = applicant.user;
+      const projectSkills = project.skillsRequired || [];
+      const userSkills = user.skills || [];
+
+      // 1. Skills Matching (40% weight)
+      const matchingSkills = projectSkills.filter(skill => 
+        userSkills.some(userSkill => 
+          userSkill.toLowerCase().includes(skill.toLowerCase()) ||
+          skill.toLowerCase().includes(userSkill.toLowerCase())
+        )
+      );
+      const skillsMatchPercentage = (matchingSkills.length / projectSkills.length) * 100;
+      score += (skillsMatchPercentage * 0.4);
+
+      // 2. Experience Level (20% weight)
+      const completedProjects = user.completedProjects || 0;
+      let experienceScore = 0;
+      if (completedProjects >= 50) experienceScore = 100;
+      else if (completedProjects >= 20) experienceScore = 80;
+      else if (completedProjects >= 10) experienceScore = 60;
+      else if (completedProjects >= 5) experienceScore = 40;
+      else if (completedProjects >= 1) experienceScore = 20;
+      score += (experienceScore * 0.2);
+
+      // 3. Rating (15% weight)
+      const rating = user.rating || 0;
+      score += (rating * 0.15);
+
+      // 4. Portfolio Relevance (15% weight)
+      const portfolio = user.portfolio || [];
+      let portfolioScore = 0;
+      if (portfolio.length > 0) {
+        // Check if portfolio has projects related to project category
+        const relevantProjects = portfolio.filter(item => {
+          const description = (item.description || '').toLowerCase();
+          const title = (item.title || '').toLowerCase();
+          const category = project.category.toLowerCase();
+          
+          return description.includes(category) || 
+                 title.includes(category) ||
+                 projectSkills.some(skill => 
+                   description.includes(skill.toLowerCase()) ||
+                   title.includes(skill.toLowerCase())
+                 );
+        });
+        portfolioScore = (relevantProjects.length / portfolio.length) * 100;
+      }
+      score += (portfolioScore * 0.15);
+
+      // 5. Premium Membership (10% weight)
+      const isPremium = applicant.IsPlanActive?.status === "approved";
+      score += (isPremium ? 100 : 0) * 0.1;
+
+      // 6. Bio Relevance (5% weight)
+      const bio = user.bio || '';
+      let bioScore = 0;
+      if (bio.length > 0) {
+        const bioLower = bio.toLowerCase();
+        const relevantTerms = projectSkills.filter(skill => 
+          bioLower.includes(skill.toLowerCase())
+        );
+        bioScore = (relevantTerms.length / projectSkills.length) * 100;
+      }
+      score += (bioScore * 0.05);
+
+      // 7. Application Quality (5% weight)
+      const coverLetter = applicant.description || '';
+      let applicationScore = 0;
+      if (coverLetter.length > 50) applicationScore = 100;
+      else if (coverLetter.length > 20) applicationScore = 60;
+      else if (coverLetter.length > 0) applicationScore = 30;
+      score += (applicationScore * 0.05);
+
+      return {
+        ...applicant.toObject(),
+        recommendationScore: Math.round(score),
+        matchingSkills,
+        skillsMatchPercentage: Math.round(skillsMatchPercentage),
+        experienceLevel: completedProjects,
+        portfolioRelevance: Math.round(portfolioScore),
+        isPremium,
+        applicationQuality: Math.round(applicationScore)
+      };
+    });
+
+    // Sort by recommendation score (highest first)
+    const recommendedApplicants = scoredApplicants
+      .filter(applicant => applicant.recommendationScore > 30) // Only show applicants with decent match
+      .sort((a, b) => b.recommendationScore - a.recommendationScore);
+
+    res.status(200).json({
+      success: true,
+      data: recommendedApplicants,
+      message: `Found ${recommendedApplicants.length} recommended applicants`
+    });
+
+  } catch (error) {
+    console.error("Get recommended applicants error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
     });
   }
 };

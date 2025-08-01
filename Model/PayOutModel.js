@@ -37,7 +37,6 @@ const withdrawalEntrySchema = new mongoose.Schema(
   {
     amount: {
       type: Number,
-      min: [500, "Minimum withdrawal is $500"],
       required: true,
     },
     netAmount: {
@@ -60,7 +59,7 @@ const withdrawalEntrySchema = new mongoose.Schema(
     transactionId: { type: String }, // For tracking the actual transfer
     notes: { type: String }, // Admin notes
   },
-  { _id: false }
+  { _id: true }
 );
 
 // Main Withdrawal Schema

@@ -104,10 +104,23 @@ export const requestWithdrawal = async (req, res) => {
     const userId = req.user.id;
     const { amount, accountIndex } = req.body;
 
+    // Fetch settings for minimum amount and tax
+    let minimumAmount = 500; // fallback default
+    let cashoutTax = 10; // fallback default
+    const settings = await SiteSettings.findOne();
+    if (settings) {
+      if (typeof settings.minimumCashoutAmount === "number") {
+        minimumAmount = settings.minimumCashoutAmount;
+      }
+      if (typeof settings.cashoutTax === "number") {
+        cashoutTax = settings.cashoutTax;
+      }
+    }
+
     // Validate amount
-    if (!amount || amount < 500) {
+    if (!amount || amount < minimumAmount) {
       return res.status(400).json({
-        error: "Minimum withdrawal amount is $500",
+        error: `Minimum withdrawal amount is $${minimumAmount}`,
       });
     }
 
@@ -175,12 +188,7 @@ export const requestWithdrawal = async (req, res) => {
       });
     }
 
-    // Fetch dynamic cashoutTax from SiteSettings
-    let cashoutTax = 10; // fallback default
-    const settings = await SiteSettings.findOne();
-    if (settings && typeof settings.cashoutTax === "number") {
-      cashoutTax = settings.cashoutTax;
-    }
+
 
     // Calculate tax (dynamic)
     const taxAmount = (amount * cashoutTax) / 100;
@@ -252,7 +260,23 @@ export const cancelWithdrawal = async (req, res) => {
       return res.status(404).json({ error: "No payout data found" });
     }
 
-    const withdrawal = payoutData.withdrawals.id(withdrawalId);
+    // Find withdrawal by ID - handle both real _id and generated IDs
+    let withdrawal = null;
+    
+    // First try to find by real _id (for new records)
+    withdrawal = payoutData.withdrawals.find(w => w._id && w._id.toString() === withdrawalId);
+    
+    // If not found, try to find by generated ID (for old records)
+    if (!withdrawal) {
+      const [payoutIdPart, indexPart] = withdrawalId.split('_');
+      if (payoutIdPart === payoutData._id.toString() && indexPart) {
+        const index = parseInt(indexPart);
+        if (!isNaN(index) && index >= 0 && index < payoutData.withdrawals.length) {
+          withdrawal = payoutData.withdrawals[index];
+        }
+      }
+    }
+    
     if (!withdrawal) {
       return res.status(404).json({ error: "Withdrawal request not found" });
     }
@@ -263,8 +287,30 @@ export const cancelWithdrawal = async (req, res) => {
       });
     }
 
-    // Remove the withdrawal
-    payoutData.withdrawals.pull(withdrawalId);
+    // Find and remove the withdrawal - handle both real _id and generated IDs
+    let withdrawalIndex = -1;
+    
+    // First try to find by real _id (for new records)
+    const withdrawalToRemove = payoutData.withdrawals.find(w => w._id && w._id.toString() === withdrawalId);
+    if (withdrawalToRemove) {
+      withdrawalIndex = payoutData.withdrawals.indexOf(withdrawalToRemove);
+    } else {
+      // Try to find by generated ID (for old records)
+      const [payoutIdPart, indexPart] = withdrawalId.split('_');
+      if (payoutIdPart === payoutData._id.toString() && indexPart) {
+        const index = parseInt(indexPart);
+        if (!isNaN(index) && index >= 0 && index < payoutData.withdrawals.length) {
+          withdrawalIndex = index;
+        }
+      }
+    }
+    
+    if (withdrawalIndex === -1) {
+      return res.status(404).json({ error: "Withdrawal request not found" });
+    }
+    
+    // Remove the withdrawal by index
+    payoutData.withdrawals.splice(withdrawalIndex, 1);
     await payoutData.save();
 
     res.status(200).json({
@@ -481,12 +527,21 @@ export const getAllWithdrawals = async (req, res) => {
     // Extract and format withdrawals data
     const withdrawals = payouts.flatMap((payout) =>
       payout.withdrawals
-        .map((withdrawal) => ({
-          ...withdrawal.toObject(),
-          _id: withdrawal._id,
-          user: payout.user,
-          payoutId: payout._id,
-        }))
+        .map((withdrawal, index) => {
+          const generatedId = withdrawal._id || `${payout._id}_${index}`;
+          console.log(`Withdrawal ${index}:`, {
+            hasRealId: !!withdrawal._id,
+            realId: withdrawal._id ? withdrawal._id.toString() : 'none',
+            generatedId: generatedId,
+            payoutId: payout._id.toString()
+          });
+          return {
+            ...withdrawal.toObject(),
+            _id: generatedId, // Generate ID for old records
+            user: payout.user,
+            payoutId: payout._id,
+          };
+        })
         .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt))
     );
 
@@ -536,8 +591,36 @@ export const updateWithdrawalStatus = async (req, res) => {
       });
     }
 
-    const withdrawal = payout.withdrawals.id(withdrawalId);
+    // Find withdrawal by ID - handle both real _id and generated IDs
+    let withdrawal = null;
+    
+    console.log('Looking for withdrawalId:', withdrawalId);
+    console.log('Payout ID:', payout._id.toString());
+    console.log('Number of withdrawals in payout:', payout.withdrawals.length);
+    
+    // First try to find by real _id (for new records)
+    withdrawal = payout.withdrawals.find(w => w._id && w._id.toString() === withdrawalId);
+    
+    // If not found, try to find by generated ID (for old records)
     if (!withdrawal) {
+      const [payoutIdPart, indexPart] = withdrawalId.split('_');
+      console.log('Split withdrawalId:', { payoutIdPart, indexPart });
+      if (payoutIdPart === payout._id.toString() && indexPart) {
+        const index = parseInt(indexPart);
+        console.log('Parsed index:', index);
+        if (!isNaN(index) && index >= 0 && index < payout.withdrawals.length) {
+          withdrawal = payout.withdrawals[index];
+          console.log('Found withdrawal by index:', withdrawal);
+        }
+      }
+    }
+    
+    if (!withdrawal) {
+      console.log('Withdrawal not found. Available withdrawal IDs:', payout.withdrawals.map((w, i) => ({
+        index: i,
+        realId: w._id ? w._id.toString() : 'none',
+        generatedId: `${payout._id}_${i}`
+      })));
       return res.status(404).json({
         success: false,
         error: "Withdrawal not found in this payout record",
@@ -558,7 +641,7 @@ export const updateWithdrawalStatus = async (req, res) => {
       success: true,
       message: "Withdrawal status updated successfully",
       data: {
-        id: withdrawal._id,
+        id: withdrawal._id || `${payout._id}_${payout.withdrawals.indexOf(withdrawal)}`,
         status: withdrawal.status,
         processedAt: withdrawal.processedAt,
       },
@@ -586,8 +669,33 @@ export const deleteWithdrawal = async (req, res) => {
       });
     }
 
-    // Remove the withdrawal
-    payout.withdrawals.pull(withdrawalId);
+    // Find and remove the withdrawal - handle both real _id and generated IDs
+    let withdrawalIndex = -1;
+    
+    // First try to find by real _id (for new records)
+    const withdrawal = payout.withdrawals.find(w => w._id && w._id.toString() === withdrawalId);
+    if (withdrawal) {
+      withdrawalIndex = payout.withdrawals.indexOf(withdrawal);
+    } else {
+      // Try to find by generated ID (for old records)
+      const [payoutIdPart, indexPart] = withdrawalId.split('_');
+      if (payoutIdPart === payout._id.toString() && indexPart) {
+        const index = parseInt(indexPart);
+        if (!isNaN(index) && index >= 0 && index < payout.withdrawals.length) {
+          withdrawalIndex = index;
+        }
+      }
+    }
+    
+    if (withdrawalIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: "Withdrawal not found in this payout record",
+      });
+    }
+    
+    // Remove the withdrawal by index
+    payout.withdrawals.splice(withdrawalIndex, 1);
     await payout.save();
 
     res.status(200).json({

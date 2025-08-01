@@ -45,6 +45,10 @@ const siteSettingsSchema = new mongoose.Schema({
     type: Number,
     default: 0, // Tax percentage for adding funds
   },
+  minimumCashoutAmount: {
+    type: Number,
+    default: 500, // Minimum amount for cashout
+  },
   // You can add more fields here for future dynamic settings
   updatedAt: {
     type: Date,

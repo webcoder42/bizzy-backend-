@@ -103,6 +103,77 @@ const jobSchema = new mongoose.Schema({
     },
   ],
 
+  // Template fields for structured project requirements
+  projectRequirements: {
+    projectOverview: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    specificFeatures: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    technicalRequirements: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    designPreferences: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    targetAudience: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    competitors: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    timeline: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    budgetBreakdown: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    deliverables: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    successMetrics: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+  },
+
+  // Experience and problem fields
+  clientExperience: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  problemsFaced: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  expectedOutcome: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+
   status: {
     type: String,
     enum: ["open", "In-progress", "completed", "cancelled"],

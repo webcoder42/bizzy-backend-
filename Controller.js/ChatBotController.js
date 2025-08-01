@@ -57,9 +57,215 @@ const calculateFees = (message) => {
   return null;
 };
 
-// Enhanced knowledge base search
+// Enhanced knowledge base search with action buttons
 const getKnowledgeBasedResponse = (message) => {
   const searchTerm = message.toLowerCase();
+
+  // Check for specific action requests
+  if (
+    searchTerm.includes("complaint") ||
+    searchTerm.includes("complain") ||
+    searchTerm.includes("issue") ||
+    searchTerm.includes("problem")
+  ) {
+    return {
+      reply: `📝 **Submit a Complaint/Issue**\n\nWe're here to help resolve your concerns quickly!\n\n**How to submit a complaint:**\n1. Go to your dashboard\n2. Click on "Help & Support"\n3. Select "Submit Complaint"\n4. Fill out the form with details\n\n**Or use the direct link below:**`,
+      actions: [
+        {
+          type: "link",
+          label: "📝 Submit Complaint",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/help",
+          description: "Click to submit your complaint"
+        },
+        {
+          type: "link", 
+          label: "📞 Contact Support",
+          url: "mailto:support@bizzy.com",
+          description: "Email our support team"
+        }
+      ],
+      isActionable: true
+    };
+  }
+
+  if (
+    searchTerm.includes("cashout") ||
+    searchTerm.includes("withdraw") ||
+    searchTerm.includes("withdrawal") ||
+    searchTerm.includes("get money")
+  ) {
+    return {
+      reply: `💰 **Cashout/Withdrawal**\n\nReady to withdraw your earnings? Here's how:\n\n**For Freelancers:**\n• Minimum withdrawal: $50\n• Processing time: 2-5 business days\n• Fee: 15% of withdrawal amount\n\n**For Clients:**\n• Refund unused funds\n• No minimum amount\n• Processing time: 3-7 business days`,
+      actions: [
+        {
+          type: "link",
+          label: "💰 Request Withdrawal",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/freelancer",
+          description: "Go to withdrawal page"
+        },
+        {
+          type: "link",
+          label: "📊 View Balance",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/freelancer",
+          description: "Check your current balance"
+        }
+      ],
+      isActionable: true
+    };
+  }
+
+  if (
+    searchTerm.includes("find job") ||
+    searchTerm.includes("search job") ||
+    searchTerm.includes("available jobs") ||
+    searchTerm.includes("projects")
+  ) {
+    return {
+      reply: `💼 **Find Jobs/Projects**\n\nDiscover amazing opportunities on BiZy!\n\n**Available Categories:**\n• Programming & Tech\n• Design & Creative\n• Writing & Content\n• Digital Marketing\n• Business & Consulting\n• And 100+ more categories\n\n**How to find jobs:**\n1. Browse available projects\n2. Filter by skills and budget\n3. Submit your proposal\n4. Get hired!`,
+      actions: [
+        {
+          type: "link",
+          label: "🔍 Browse Jobs",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/freelancer",
+          description: "View available projects"
+        },
+        {
+          type: "link",
+          label: "📝 My Proposals",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/freelancer",
+          description: "Check your submitted proposals"
+        }
+      ],
+      isActionable: true
+    };
+  }
+
+  if (
+    searchTerm.includes("post job") ||
+    searchTerm.includes("hire") ||
+    searchTerm.includes("post project") ||
+    searchTerm.includes("find freelancer")
+  ) {
+    return {
+      reply: `🎯 **Post a Job/Hire Freelancers**\n\nReady to find the perfect talent for your project?\n\n**How it works:**\n1. Create your project description\n2. Set budget and timeline\n3. Review proposals from freelancers\n4. Choose the best match\n5. Start working together\n\n**Benefits:**\n• Access to top 5% talent\n• Secure milestone payments\n• Quality guarantee`,
+      actions: [
+        {
+          type: "link",
+          label: "📝 Post New Job",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/client",
+          description: "Create a new job posting"
+        },
+        {
+          type: "link",
+          label: "👥 Browse Freelancers",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/client",
+          description: "Find talented freelancers"
+        }
+      ],
+      isActionable: true
+    };
+  }
+
+  if (
+    searchTerm.includes("payment") ||
+    searchTerm.includes("billing") ||
+    searchTerm.includes("add funds") ||
+    searchTerm.includes("deposit")
+  ) {
+    return {
+      reply: `💳 **Payment & Billing**\n\nManage your payments and billing easily!\n\n**Available Options:**\n• Credit/Debit Cards\n• Bank Transfers\n• Digital Wallets\n• Cryptocurrency\n• Mobile Payments\n\n**Features:**\n• Multi-currency support (50+ currencies)\n• Secure transactions\n• Real-time processing\n• Low fees (1.5% + $0.30)`,
+      actions: [
+        {
+          type: "link",
+          label: "💰 Add Funds",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/client/billing",
+          description: "Add money to your account"
+        },
+        {
+          type: "link",
+          label: "📊 Transaction History",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/client/billing",
+          description: "View your payment history"
+        }
+      ],
+      isActionable: true
+    };
+  }
+
+  if (
+    searchTerm.includes("profile") ||
+    searchTerm.includes("account") ||
+    searchTerm.includes("settings")
+  ) {
+    return {
+      reply: `👤 **Profile & Account Settings**\n\nManage your account and profile information.\n\n**What you can do:**\n• Update personal information\n• Change password\n• Manage notifications\n• Update skills and portfolio\n• Set payment preferences\n• Privacy settings`,
+      actions: [
+        {
+          type: "link",
+          label: "👤 My Profile",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/freelancer",
+          description: "View and edit your profile"
+        },
+        {
+          type: "link",
+          label: "⚙️ Account Settings",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/freelancer",
+          description: "Manage account settings"
+        }
+      ],
+      isActionable: true
+    };
+  }
+
+  if (
+    searchTerm.includes("quiz") ||
+    searchTerm.includes("test") ||
+    searchTerm.includes("skill test")
+  ) {
+    return {
+      reply: `📝 **Skill Quiz/Test**\n\nTake skill quizzes to showcase your expertise!\n\n**Available Skills:**\n• Programming (JavaScript, Python, React, etc.)\n• Design (UI/UX, Graphic Design, etc.)\n• Writing (Content, Technical, Creative)\n• Marketing (Digital, Social Media, SEO)\n• Business (Consulting, Strategy, Analysis)\n\n**Benefits:**\n• Prove your skills to clients\n• Get higher project rates\n• Stand out from competition\n• Build credibility`,
+      actions: [
+        {
+          type: "link",
+          label: "📝 Take Quiz",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/freelancer",
+          description: "Start a skill quiz"
+        },
+        {
+          type: "link",
+          label: "🏆 My Certificates",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/freelancer",
+          description: "View your completed quizzes"
+        }
+      ],
+      isActionable: true
+    };
+  }
+
+  if (
+    searchTerm.includes("team") ||
+    searchTerm.includes("collaboration") ||
+    searchTerm.includes("team hub")
+  ) {
+    return {
+      reply: `👥 **Team Hub & Collaboration**\n\nWork together seamlessly with your team!\n\n**Features:**\n• Real-time collaboration\n• File sharing and management\n• Project tracking\n• Team communication\n• Task assignment\n• Progress monitoring\n\n**Perfect for:**\n• Large projects\n• Team-based work\n• Client collaboration\n• Project management`,
+      actions: [
+        {
+          type: "link",
+          label: "👥 Team Hub",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/freelancer",
+          description: "Access team collaboration tools"
+        },
+        {
+          type: "link",
+          label: "📁 My Projects",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/freelancer",
+          description: "View your active projects"
+        }
+      ],
+      isActionable: true
+    };
+  }
 
   // Check for specific categories
   if (
@@ -96,7 +302,21 @@ const getKnowledgeBasedResponse = (message) => {
       reply: `🔄 **How BuzYoo Works:**\n\n${steps
         .map((step) => `${step.step}. **${step.title}** - ${step.description}`)
         .join("\n")}\n\n✨ It's that simple! Start your journey today.`,
-      isKnowledgeBased: true,
+      actions: [
+        {
+          type: "link",
+          label: "🚀 Get Started",
+          url: "/register",
+          description: "Create your account"
+        },
+        {
+          type: "link",
+          label: "📚 Learn More",
+          url: "/doc",
+          description: "Read our documentation"
+        }
+      ],
+      isActionable: true
     };
   }
 
@@ -123,7 +343,24 @@ const getKnowledgeBasedResponse = (message) => {
       });
     });
 
-    return { reply, isKnowledgeBased: true };
+    return { 
+      reply,
+      actions: [
+        {
+          type: "link",
+          label: "📦 View Plans",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/freelancer",
+          description: "See all available plans"
+        },
+        {
+          type: "link",
+          label: "💳 Upgrade Plan",
+          url: "/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/freelancer",
+          description: "Upgrade your current plan"
+        }
+      ],
+      isActionable: true
+    };
   }
 
   if (
@@ -167,7 +404,21 @@ const getKnowledgeBasedResponse = (message) => {
       }\n• Priority: ${support.responseTimes.priority}\n• VIP: ${
         support.responseTimes.vip
       }\n\n💬 We're here to help you succeed!`,
-      isKnowledgeBased: true,
+      actions: [
+        {
+          type: "link",
+          label: "📞 Contact Support",
+          url: "mailto:support@bizzy.com",
+          description: "Email our support team"
+        },
+        {
+          type: "link",
+          label: "📚 Help Center",
+          url: "/doc",
+          description: "Browse help articles"
+        }
+      ],
+      isActionable: true
     };
   }
 
@@ -197,7 +448,21 @@ const getKnowledgeBasedResponse = (message) => {
         .join(
           "\n"
         )}\n\n✨ Ready to start your journey? Create your account today!`,
-      isKnowledgeBased: true,
+      actions: [
+        {
+          type: "link",
+          label: "🚀 Sign Up",
+          url: "/register",
+          description: "Create your account"
+        },
+        {
+          type: "link",
+          label: "📚 Learn More",
+          url: "/doc",
+          description: "Read our guide"
+        }
+      ],
+      isActionable: true
     };
   }
 
@@ -257,12 +522,15 @@ export const handleUserChat = async (req, res) => {
         userEmail,
         username,
         isKnowledgeBased: knowledgeResponse.isKnowledgeBased,
+        isActionable: knowledgeResponse.isActionable,
       });
 
       await chat.save();
       return res.status(200).json({
         reply: knowledgeResponse.reply,
-        isKnowledgeBased: true,
+        isKnowledgeBased: knowledgeResponse.isKnowledgeBased,
+        isActionable: knowledgeResponse.isActionable,
+        actions: knowledgeResponse.actions || [],
       });
     }
 
@@ -339,7 +607,9 @@ Always provide helpful, accurate information about BiZy platform. If you don't k
         if (fallbackResponse) {
           res.status(200).json({
             reply: fallbackResponse.reply,
-            isKnowledgeBased: true,
+            isKnowledgeBased: fallbackResponse.isKnowledgeBased,
+            isActionable: fallbackResponse.isActionable,
+            actions: fallbackResponse.actions || [],
           });
         } else {
           res.status(200).json({
