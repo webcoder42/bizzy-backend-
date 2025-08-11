@@ -9,7 +9,9 @@ import {
   getTotalPlanPurchaseAmount,
   getMonthlyPlanPurchaseAmounts,
   getAllTimeMonthlyPurchases,
-  getAllPlanPurchases
+  getAllPlanPurchases,
+  payTabsCallback,
+  verifyPayTabsPayment
 } from "../Controller.js/PlanPurchaseController.js";
 import { requireSignIn } from "../middleware/UserMiddleware.js";
 
@@ -29,5 +31,9 @@ router.get("/total-purchase-amount", requireSignIn, getTotalPlanPurchaseAmount);
 router.get("/monthly-purchase-amounts", requireSignIn, getMonthlyPlanPurchaseAmounts);
 router.get("/alltime-monthly-purchases", requireSignIn, getAllTimeMonthlyPurchases);
 router.get("/all-purchase", requireSignIn, getAllPlanPurchases);
+
+// PayTabs routes
+router.post("/paytabs-callback", payTabsCallback);
+router.post("/verify-paytabs-payment", requireSignIn, verifyPayTabsPayment);
 
 export default router;

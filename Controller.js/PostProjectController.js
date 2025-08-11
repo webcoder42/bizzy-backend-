@@ -4,6 +4,7 @@ import ProjectApplyModel from "../Model/ProjectApplyModel.js";
 import nodemailer from "nodemailer";
 import SubmitProjectModel from "../Model/SubmitProjectModel.js";
 import dotenv from "dotenv";
+import mongoose from "mongoose";
 import SiteSettings from "../Model/SiteSettingsModel.js";
 // === Nodemailer Transporter ===
 dotenv.config();
@@ -226,7 +227,7 @@ export const updateJobPost = async (req, res) => {
     }
 
     // Check if the logged-in user is the owner
-    if (job.client.toString() !== req.user.id) {
+    if (!job.client.equals(req.user.id)) {
       return res.status(403).json({
         success: false,
         message: "Forbidden - You can only update your own job posts",
@@ -241,6 +242,10 @@ export const updateJobPost = async (req, res) => {
       category,
       skillsRequired,
       status,
+      experience,
+      problems,
+      bonus,
+      deadline,
     } = req.body;
 
     const user = await UserModel.findById(req.user.id);
@@ -286,12 +291,20 @@ export const updateJobPost = async (req, res) => {
     if (description) job.description = description;
     if (duration) job.duration = duration;
     if (category) job.category = category;
+    if (experience) job.experience = experience;
+    if (problems) job.problems = problems;
+    if (bonus) job.bonus = bonus;
     if (skillsRequired) {
       job.skillsRequired = Array.isArray(skillsRequired)
         ? skillsRequired
         : [skillsRequired];
     }
-    if (status) job.status = status;
+    if (status) {
+      // Normalize status to match enum values
+      const normalizedStatus = status.toLowerCase().replace(' ', '-');
+      job.status = normalizedStatus;
+    }
+    if (deadline) job.deadline = new Date(deadline);
 
     const updatedJob = await job.save();
 
@@ -555,7 +568,7 @@ export const getApplicantsForProject = async (req, res) => {
       .populate({
         path: "user",
         select:
-          "username email profileImage completedProjects rating plan maxProjectPerDay socialLinks",
+          "username email profileImage completedProjects rating plan maxProjectPerDay socialLinks availability lastSeen",
       })
       .populate({
         path: "IsPlanActive",
@@ -988,7 +1001,7 @@ export const getRecommendedApplicants = async (req, res) => {
 
     // Get all applicants for this project
     const applicants = await ProjectApplyModel.find({ project: projectId })
-      .populate('user', 'Fullname username email skills portfolio completedProjects rating bio UserType')
+      .populate('user', 'Fullname username email skills portfolio completedProjects rating bio UserType availability lastSeen')
       .populate('IsPlanActive');
 
     if (!applicants || applicants.length === 0) {

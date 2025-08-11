@@ -475,11 +475,8 @@ export const checkIfUserApplied = async (req, res) => {
 export const deleteApplicantProposalAdmin = async (req, res) => {
   try {
     const { projectId, applicantId } = req.params;
-    console.log("[DEBUG] projectId:", projectId, typeof projectId);
-    console.log("[DEBUG] applicantId:", applicantId, typeof applicantId);
     // Fetch applicant and project
     const application = await ProjectApplyModel.findOne({ project: projectId, user: applicantId }).populate("user", "email username").populate("project", "title");
-    console.log("[DEBUG] application found:", application);
     if (!application) {
       return res.status(404).json({ success: false, message: "Application not found" });
     }

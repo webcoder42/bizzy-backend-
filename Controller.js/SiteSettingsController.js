@@ -43,12 +43,13 @@ export const updateSiteSettings = async (req, res) => {
     if (!settings) {
       return res.status(404).json({ error: 'No settings found. Please add settings first.' });
     }
-    const { siteTitle, siteDescription, cashoutTax, postProjectTax, addFundTax } = req.body;
+    const { siteTitle, siteDescription, cashoutTax, postProjectTax, addFundTax, taskCompletionTax } = req.body;
     if (siteTitle !== undefined) settings.siteTitle = siteTitle;
     if (siteDescription !== undefined) settings.siteDescription = siteDescription;
     if (cashoutTax !== undefined) settings.cashoutTax = cashoutTax;
     if (postProjectTax !== undefined) settings.postProjectTax = postProjectTax;
     if (addFundTax !== undefined) settings.addFundTax = addFundTax;
+    if (taskCompletionTax !== undefined) settings.taskCompletionTax = taskCompletionTax;
     // Handle logo upload (if file provided)
     if (req.file) {
       if (settings.siteLogo && fs.existsSync(settings.siteLogo)) {

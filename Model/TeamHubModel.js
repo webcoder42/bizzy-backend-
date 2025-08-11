@@ -1,140 +1,187 @@
 import mongoose from "mongoose";
-
 const { Schema, model } = mongoose;
 
-const teamHubSchema = new Schema({
-  name: {
-    type: String,
-    required: true,
-  },
-  description: String,
-  logo: String, // optional logo URL
-  createdBy: {
-    type: Schema.Types.ObjectId,
-    ref: "users",
-    required: true,
-  },
-  members: [
-    {
-      user: {
-        type: Schema.Types.ObjectId,
-        ref: "users",
-      },
-      role: {
-        type: String,
-        enum: ["group-admin", "member"],
-        default: "member",
-      },
-      joinedAt: {
-        type: Date,
-        default: Date.now,
-      },
+const teamHubSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
     },
-  ],
-  tasks: [
-    {
-      title: String,
-      description: String,
-      amount: Number,
-      assignedTo: {
-        type: Schema.Types.ObjectId,
-        ref: "users",
-      },
-      status: {
-        type: String,
-        enum: ["todo", "in_progress", "done"],
-        default: "todo",
-      },
-      dueDate: Date,
-      createdAt: {
-        type: Date,
-        default: Date.now,
-      },
-      // ✅ New Submission Field
-      submission: {
-        submittedBy: {
+    description: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    logo: {
+      type: String,
+      default: "",
+    },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "users",
+      required: true,
+    },
+    members: [
+      {
+        user: {
           type: Schema.Types.ObjectId,
           ref: "users",
         },
-        submittedAt: {
+        role: {
+          type: String,
+          enum: ["admin", "member"],
+          default: "member",
+        },
+        joinedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        status: {
+          type: String,
+          enum: ["active", "inactive"],
+          default: "active",
+        },
+      },
+    ],
+    joinRequests: [
+      {
+        user: {
+          type: Schema.Types.ObjectId,
+          ref: "users",
+        },
+        message: {
+          type: String,
+          trim: true,
+        },
+        status: {
+          type: String,
+          enum: ["pending", "approved", "rejected"],
+          default: "pending",
+        },
+        requestedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+    chat: [
+      {
+        sender: {
+          type: Schema.Types.ObjectId,
+          ref: "users",
+          required: true,
+        },
+        message: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        timestamp: {
+          type: Date,
+          default: Date.now,
+        },
+        isAdmin: {
+          type: Boolean,
+          default: false,
+        },
+      },
+    ],
+    tasks: [
+      {
+        title: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        description: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        assignedTo: {
+          type: Schema.Types.ObjectId,
+          ref: "users",
+        },
+        assignedToEmail: {
+          type: String,
+          trim: true,
+        },
+        amount: {
+          type: Number,
+          default: 0,
+        },
+        status: {
+          type: String,
+          enum: ["pending", "in-progress", "completed", "cancelled"],
+          default: "pending",
+        },
+        priority: {
+          type: String,
+          enum: ["low", "medium", "high", "urgent"],
+          default: "medium",
+        },
+        dueDate: {
           type: Date,
         },
-        note: String, // optional message
-        file: String, // optional file proof URL or path
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+        completedAt: {
+          type: Date,
+        },
+        file: String,
+        fileProof: String,
+        proofDescription: String,
+        proofSubmittedAt: Date,
+        proofStatus: {
+          type: String,
+          enum: ["pending", "approved", "rejected"],
+          default: "pending",
+        },
+        proofFeedback: String,
+      },
+    ],
+    settings: {
+      allowMemberInvites: {
+        type: Boolean,
+        default: true,
+      },
+      allowTaskCreation: {
+        type: Boolean,
+        default: true,
+      },
+      allowMessages: {
+        type: Boolean,
+        default: true,
+      },
+      maxMembers: {
+        type: Number,
+        default: 10,
+      },
+      taskApprovalRequired: {
+        type: Boolean,
+        default: false,
       },
     },
-  ],
-
-  chat: [
-    {
-      sender: {
-        type: Schema.Types.ObjectId,
-        ref: "users",
-      },
-      message: String,
-      timestamp: {
-        type: Date,
-        default: Date.now,
-      },
-    },
-  ],
-  activityLog: [
-    {
-      activity: String,
-      user: {
-        type: Schema.Types.ObjectId,
-        ref: "users",
-      },
-      timestamp: {
-        type: Date,
-        default: Date.now,
-      },
-    },
-  ],
-  settings: {
-    isPublic: {
-      type: Boolean,
-      default: false,
-    },
-    allowClientAccess: {
-      type: Boolean,
-      default: false,
-    },
-    allowMembersToChat: {
-      // 👈 admin controls whether non-admins can send messages
+    isActive: {
       type: Boolean,
       default: true,
     },
-    allowMembersToAssignTasks: {
-      // 👈 optional: whether members can assign tasks
-      type: Boolean,
-      default: false,
+    planId: {
+      type: Schema.Types.ObjectId,
+      ref: "PlanPurchase",
     },
   },
-  sharedFiles: [
-    {
-      name: String,
-      type: {
-        type: String,
-        enum: ["file", "folder"],
-        default: "file",
-      },
-      path: String, // Local path or cloud URL (e.g. S3, Firebase, etc.)
-      uploadedBy: {
-        type: Schema.Types.ObjectId,
-        ref: "users",
-      },
-      uploadedAt: {
-        type: Date,
-        default: Date.now,
-      },
-    },
-  ],
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  {
+    timestamps: true,
+  }
+);
+
+teamHubSchema.index({ createdBy: 1 });
+teamHubSchema.index({ "members.user": 1 });
+teamHubSchema.index({ "joinRequests.user": 1 });
 
 const TeamHub = model("TeamHub", teamHubSchema);
 export default TeamHub;

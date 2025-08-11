@@ -7,6 +7,7 @@ import {
   submitProject,
   updateSubmissionStatus,
   getProjectSubmissionForClient,
+  getAllProjectSubmissionsForClient,
   checkUserApprovedSubmissions,
   checkUserInProgressSubmissions,
 } from "../Controller.js/SubmitProjectController.js";
@@ -27,6 +28,9 @@ router.put("/project-update/:id", requireSignIn, updateSubmissionStatus);
 
 // New route for client to view project submission
 router.get("/client/submission/:projectId", requireSignIn, getProjectSubmissionForClient);
+
+// Route to get all submissions for a project (for client)
+router.get("/project/:projectId", requireSignIn, getAllProjectSubmissionsForClient);
 
 // Route to get all approved submissions for a user
 router.get("/approved/:userId", checkUserApprovedSubmissions);

@@ -45,6 +45,10 @@ const siteSettingsSchema = new mongoose.Schema({
     type: Number,
     default: 0, // Tax percentage for adding funds
   },
+  taskCompletionTax: {
+    type: Number,
+    default: 2, // Tax percentage for task completion (2% default)
+  },
   minimumCashoutAmount: {
     type: Number,
     default: 500, // Minimum amount for cashout

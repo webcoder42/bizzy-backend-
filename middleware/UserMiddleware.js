@@ -18,6 +18,8 @@ export const requireSignIn = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+
+
     // Find user in database to ensure they still exist and get fresh data
     const user = await UserModel.findById(decoded.id);
     if (!user) {
@@ -33,6 +35,8 @@ export const requireSignIn = async (req, res, next) => {
       email: user.email,
       role: user.role,
     };
+
+
 
     next();
   } catch (error) {

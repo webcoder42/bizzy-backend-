@@ -23,12 +23,16 @@ import SubmitProjectRoute from "./Route/SubmitProjectRoute.js";
 import MessageRoute from "./Route/MessageRoute.js";
 import ChatBotRoute from "./Route/ChatBotRoute.js";
 import HelpCenterRoute from "./Route/HelpCenterRoute.js";
-import TeamHubRoute from "./Route/TeamHubRoute.js";
 import PayoutRoute from "./Route/payoutRoutes.js";
 import BlogRoute from "./Route/BlogRoute.js";
 import QuizRoute from "./Route/QuizRoute.js";
 import SiteSettingsRoute from "./Route/SiteSettingsRoute.js";
+import AutoCompletionRoute from "./Route/AutoCompletionRoute.js";
+import ActivityRoute from "./Route/ActivityRoute.js";
+import TeamHubRoute from "./Route/TeamHubRoute.js";
 import { setupSocketIO } from "./Controller.js/MessageController.js";
+import { initializeCronJobs } from "./services/CronScheduler.js";
+import { initializeActivityTracking } from "./services/ActivityTrackingService.js";
 
 // __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -111,16 +115,24 @@ app.use("/api/v1/submit", SubmitProjectRoute);
 app.use("/api/v1/message", MessageRoute);
 app.use("/api/v1/chat", ChatBotRoute);
 app.use("/api/v1/helpCenter", HelpCenterRoute);
-app.use("/api/v1/teamhub", TeamHubRoute);
 app.use("/api/v1/payout", PayoutRoute);
 app.use("/api/v1/blog", BlogRoute);
 app.use("/api/v1/quiz", QuizRoute);
 app.use("/api/site-settings", SiteSettingsRoute);
+app.use("/api/v1/auto-completion", AutoCompletionRoute);
+app.use("/api/v1/activity", ActivityRoute);
+app.use("/api/v1/teamhub", TeamHubRoute);
 
 // Root
 app.get("/", (req, res) => {
   res.send("Welcome to BiZZy");
 });
+
+// Initialize cron jobs
+initializeCronJobs();
+
+// Initialize activity tracking
+initializeActivityTracking();
 
 // Start server
 const PORT = process.env.PORT || 8080;

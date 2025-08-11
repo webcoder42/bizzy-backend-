@@ -7,6 +7,7 @@ import PlanPurchaseModel from "../Model/PlanPurchaseModel.js";
 import dotenv from "dotenv";
 dotenv.config();
 import SiteSettings from "../Model/SiteSettingsModel.js";
+import PayTabsService from "../services/PayTabsService.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -263,13 +264,6 @@ export const addFunds = async (req, res) => {
       return res.status(400).json({ message: "Minimum amount is $10." });
     }
 
-    // Only card payments are supported
-    if (paymentMethod !== "card") {
-      return res
-        .status(400)
-        .json({ message: "Only card payments are supported." });
-    }
-
     // Validate user
     const user = await UserModel.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found." });
@@ -281,53 +275,213 @@ export const addFunds = async (req, res) => {
       addFundTax = settings.addFundTax;
     }
 
-    // Create Stripe payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // cents
-      currency: "usd",
-      metadata: {
-        userId: userId.toString(),
-        purpose: "add_funds",
-      },
-      payment_method: paymentDetails.paymentMethodId,
-      confirm: true,
-      return_url:
-        "http://localhost:3000/BiZy/user/dashboard/client/fundsummary",
-    });
+    // Handle different payment methods
+    if (paymentMethod === "card") {
+      // Stripe payment
+      if (!paymentDetails.paymentMethodId) {
+        return res.status(400).json({ message: "Payment method ID is required for card payments." });
+      }
 
-    if (paymentIntent.status === "succeeded") {
-      // Update user totalEarnings with (100 - addFundTax)% of the amount
-      const amountToAdd = amount - (amount * addFundTax) / 100;
-      user.totalEarnings = (user.totalEarnings || 0) + amountToAdd;
-      // Push add fund log object
-      user.addFundLogs = user.addFundLogs || [];
-      user.addFundLogs.push({
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // cents
+        currency: "usd",
+        metadata: {
+          userId: userId.toString(),
+          purpose: "add_funds",
+        },
+        payment_method: paymentDetails.paymentMethodId,
+        confirm: true,
+        return_url:
+          "http://localhost:3000/BiZy/user/dashboard/client/fundsummary",
+      });
+
+      if (paymentIntent.status === "succeeded") {
+        // Update user totalEarnings with (100 - addFundTax)% of the amount
+        const amountToAdd = amount - (amount * addFundTax) / 100;
+        user.totalEarnings = (user.totalEarnings || 0) + amountToAdd;
+        
+        // Add earning log for fund addition
+        user.EarningLogs = user.EarningLogs || [];
+        user.EarningLogs.push({
+          amount: amountToAdd,
+          date: new Date(),
+        });
+        
+        // Push add fund log object
+        user.addFundLogs = user.addFundLogs || [];
+        user.addFundLogs.push({
+          amount: amount,
+          credited: amountToAdd,
+          date: new Date(),
+          note: "",
+        });
+        await user.save();
+
+        return res.status(200).json({
+          message: "Funds added successfully.",
+          amountAdded: amountToAdd,
+          taxPercent: addFundTax,
+          taxAmount: (amount * addFundTax) / 100,
+          originalAmount: amount,
+          receiptUrl: paymentIntent.charges?.data[0]?.receipt_url,
+        });
+      } else {
+        // Return client secret if action required
+        return res.status(200).json({
+          clientSecret: paymentIntent.client_secret,
+        });
+      }
+    } else if (paymentMethod === "paytabs") {
+      // PayTabs payment
+      const referenceNumber = `FUND_${userId}_${Date.now()}`;
+      
+      const paymentData = {
         amount: amount,
-        credited: amountToAdd,
-        date: new Date(),
-        note: "",
-      });
-      await user.save();
+        currency: 'USD',
+        referenceNumber: referenceNumber,
+        customerEmail: user.email,
+        customerName: user.name || user.username,
+        customerPhone: user.phone || '',
+        customerAddress: user.address || '',
+        customerCity: user.city || '',
+        customerCountry: user.country || 'US',
+        customerZip: user.zipCode || '',
+        returnUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/client/paytabs-verification?ref=${referenceNumber}`,
+        callbackUrl: `${process.env.SERVER_URL || 'http://localhost:5000'}/planpurchase/paytabs-callback`
+      };
 
-      return res.status(200).json({
-        message: "Funds added successfully.",
-        amountAdded: amountToAdd,
-        taxPercent: addFundTax,
-        taxAmount: (amount * addFundTax) / 100,
-        originalAmount: amount,
-        receiptUrl: paymentIntent.charges?.data[0]?.receipt_url,
-      });
+      const paytabsResponse = await PayTabsService.createPaymentPage(paymentData);
+      
+      if (paytabsResponse.redirect_url) {
+        return res.status(200).json({
+          paymentUrl: paytabsResponse.redirect_url,
+          referenceNumber: referenceNumber,
+          message: "Redirect to PayTabs payment page"
+        });
+      } else {
+        throw new Error('Failed to create PayTabs payment page');
+      }
     } else {
-      // Return client secret if action required
-      return res.status(200).json({
-        clientSecret: paymentIntent.client_secret,
-      });
+      return res.status(400).json({ message: "Invalid payment method. Supported methods: card, paytabs" });
     }
   } catch (err) {
     console.error("Add funds error:", err);
     res
       .status(500)
       .json({ message: "Internal server error", error: err.message });
+  }
+};
+
+export const payTabsCallback = async (req, res) => {
+  try {
+    const callbackData = req.body;
+    
+    // Process the callback data
+    const processedData = await PayTabsService.processCallback(callbackData);
+    
+    if (processedData.isValid) {
+      // Extract user ID from cart_id (format: FUND_userId_timestamp)
+      const cartId = processedData.cartId;
+      const userId = cartId.split('_')[1];
+      
+      if (!userId) {
+        console.error('Invalid cart ID format:', cartId);
+        return res.status(400).json({ message: 'Invalid cart ID' });
+      }
+
+      // Find user
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        console.error('User not found:', userId);
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Fetch dynamic addFundTax from SiteSettings
+      let addFundTax = 10; // fallback default
+      const settings = await SiteSettings.findOne();
+      if (settings && typeof settings.addFundTax === 'number') {
+        addFundTax = settings.addFundTax;
+      }
+
+      // Calculate amount to add (after tax)
+      const amount = processedData.amount;
+      const amountToAdd = amount - (amount * addFundTax) / 100;
+
+      // Update user totalEarnings
+      user.totalEarnings = (user.totalEarnings || 0) + amountToAdd;
+      
+      // Add earning log for fund addition
+      user.EarningLogs = user.EarningLogs || [];
+      user.EarningLogs.push({
+        amount: amountToAdd,
+        date: new Date(),
+      });
+      
+      // Push add fund log object
+      user.addFundLogs = user.addFundLogs || [];
+      user.addFundLogs.push({
+        amount: amount,
+        credited: amountToAdd,
+        date: new Date(),
+        note: `PayTabs Transaction: ${processedData.transactionReference}`,
+      });
+
+      await user.save();
+
+      console.log(`PayTabs payment successful for user ${userId}, amount: ${amount}, added: ${amountToAdd}`);
+      
+      return res.status(200).json({ 
+        message: 'Payment processed successfully',
+        transactionReference: processedData.transactionReference,
+        amount: amount,
+        amountAdded: amountToAdd
+      });
+    } else {
+      console.error('PayTabs payment failed:', processedData);
+      return res.status(400).json({ 
+        message: 'Payment failed',
+        error: processedData.message 
+      });
+    }
+  } catch (error) {
+    console.error('PayTabs callback error:', error);
+    return res.status(500).json({ 
+      message: 'Internal server error',
+      error: error.message 
+    });
+  }
+};
+
+export const verifyPayTabsPayment = async (req, res) => {
+  try {
+    const { transactionReference } = req.body;
+    
+    if (!transactionReference) {
+      return res.status(400).json({ message: 'Transaction reference is required' });
+    }
+
+    const verificationResult = await PayTabsService.verifyPayment(transactionReference);
+    
+    if (verificationResult.resp_status === 'A' && verificationResult.resp_code === '4000') {
+      return res.status(200).json({
+        success: true,
+        message: 'Payment verified successfully',
+        data: verificationResult
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment verification failed',
+        data: verificationResult
+      });
+    }
+  } catch (error) {
+    console.error('PayTabs verification error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: error.message
+    });
   }
 };
 

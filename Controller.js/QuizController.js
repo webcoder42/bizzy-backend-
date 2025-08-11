@@ -58,7 +58,6 @@ Return ONLY a pure JSON array of 10 such question objects. No explanations, no t
     });
 
     const output = response.choices[0]?.message?.content;
-    console.log("🔍 Raw AI Output:", output); // for debugging
 
     let questions = [];
 

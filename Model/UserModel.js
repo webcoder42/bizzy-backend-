@@ -292,11 +292,23 @@ const userSchema = new mongoose.Schema(
         image: String,
       },
     ],
-
     totalEarnings: {
       type: Number,
       default: 0,
     },
+    EarningLogs: [
+      {
+        amount: {
+          type: Number,
+          required: true,
+        },
+        date: {
+          type: Date,
+          default: Date.now,
+        },
+       
+      }
+    ],
     // New field to store add fund logs as an array of objects
     addFundLogs: [
       {
@@ -346,6 +358,11 @@ const userSchema = new mongoose.Schema(
     },
 
     lastLogin: {
+      type: Date,
+      default: Date.now,
+    },
+
+    lastSeen: {
       type: Date,
       default: Date.now,
     },

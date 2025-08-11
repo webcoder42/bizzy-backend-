@@ -228,7 +228,7 @@ export const checkUserProjectSubmission = async (req, res) => {
       project: projectId,
     })
       .sort({ submittedAt: -1 })
-      .populate("user", "name email")
+      .populate("user", "username name email rating completedProjects")
       .populate("project", "title description");
 
     if (!submission) {
@@ -346,6 +346,13 @@ export const updateSubmissionStatus = async (req, res) => {
 
           if (project.budget) {
             submittingUser.totalEarnings += project.budget;
+            
+            // Add earning log for project completion
+            submittingUser.EarningLogs = submittingUser.EarningLogs || [];
+            submittingUser.EarningLogs.push({
+              amount: project.budget,
+              date: new Date(),
+            });
           }
 
           await submittingUser.save({ session });
@@ -538,6 +545,44 @@ export const getProjectSubmissionForClient = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "Failed to fetch project submission",
+    });
+  }
+};
+
+// Get All Submissions for a Project (for Client)
+export const getAllProjectSubmissionsForClient = async (req, res) => {
+  try {
+    const projectId = req.params.projectId;
+    const clientId = req.user.id;
+
+    // Find the project and verify it belongs to the client
+    const project = await PostProjectModel.findOne({
+      _id: projectId,
+      client: clientId,
+    });
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found or you don't have permission to view it",
+      });
+    }
+
+    // Find all submissions for this project
+    const submissions = await SubmitProjectModel.find({ project: projectId })
+      .populate("user", "username email rating completedProjects")
+      .populate("project", "title description budget status")
+      .sort({ submittedAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: submissions,
+    });
+  } catch (err) {
+    console.error("❌ Error fetching project submissions:", err);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch project submissions",
     });
   }
 };

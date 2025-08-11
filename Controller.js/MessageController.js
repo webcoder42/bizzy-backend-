@@ -1,6 +1,7 @@
 import MessageModel from "../Model/MessageModel.js";
 import PostProjectModel from "../Model/PostProjectModel.js";
 import UserModel from "../Model/UserModel.js";
+import { updateUserActivity } from "../services/ActivityTrackingService.js";
 
 import mongoose from "mongoose";
 
@@ -9,11 +10,18 @@ let ioGlobal = null;
 export const setupSocketIO = (io) => {
   ioGlobal = io;
   io.on("connection", (socket) => {
-    console.log("Socket connected:", socket.id);
 
     socket.on("join", (userId) => {
       if (mongoose.Types.ObjectId.isValid(userId)) {
         socket.join(userId);
+        // Update user availability to online when they join
+        updateUserActivity(userId);
+      }
+    });
+
+    socket.on("user-activity", async (userId) => {
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        await updateUserActivity(userId);
       }
     });
 
@@ -90,8 +98,14 @@ export const setupSocketIO = (io) => {
       socket.to(to).emit("stopTyping", socket.user?._id);
     });
 
-    socket.on("disconnect", () => {
-      console.log("Socket disconnected:", socket.id);
+    socket.on("disconnect", async () => {
+      // Set user offline when they disconnect
+      if (socket.userId) {
+        await UserModel.findByIdAndUpdate(socket.userId, {
+          availability: "offline",
+          lastSeen: new Date()
+        });
+      }
     });
   });
 };

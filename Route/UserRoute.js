@@ -26,6 +26,7 @@ import {
   resetPassword,
   getTotalAddFundAmount,
   getMonthlyAddFundAmounts,
+  getUserEarningLogs,
 } from "../Controller.js/UserController.js";
 import { loginLimiter } from "./../middleware/rateLimiter.js";
 import { isAdmin, requireSignIn } from "./../middleware/UserMiddleware.js";
@@ -120,5 +121,8 @@ router.post("/forgot-password/reset", resetPassword);
 
 router.get("/total-add-fund", requireSignIn, isAdmin, getTotalAddFundAmount);
 router.get("/monthly-add-fund", requireSignIn, isAdmin, getMonthlyAddFundAmounts);
+
+// Get user earning logs
+router.get("/earning-logs", requireSignIn, getUserEarningLogs);
 
 export default router;

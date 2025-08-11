@@ -544,8 +544,10 @@ export const verifyLoginCode = async (req, res) => {
     loginData.isVerified = true;
     loginVerificationStore.set(email, loginData);
 
-    // Update last login
+    // Update last login and set user as online
     user.lastLogin = new Date();
+    user.lastSeen = new Date();
+    user.availability = "online";
     await user.save();
 
     // Generate JWT token
@@ -797,8 +799,10 @@ export const googleLogin = async (req, res) => {
       });
     }
 
-    // Update last login
+    // Update last login and set user as online
     user.lastLogin = new Date();
+    user.lastSeen = new Date();
+    user.availability = "online";
     await user.save();
 
     // Generate JWT token
@@ -1784,5 +1788,43 @@ export const getMonthlyAddFundAmounts = async (req, res) => {
   } catch (error) {
     console.error("Error getting monthly add fund amounts:", error);
     return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+};
+
+// Get user earning logs
+export const getUserEarningLogs = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const user = await UserModel.findById(userId).select("EarningLogs totalEarnings");
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+
+    // Sort earning logs by date (newest first)
+    const sortedEarningLogs = user.EarningLogs ? 
+      user.EarningLogs.sort((a, b) => new Date(b.date) - new Date(a.date)) : 
+      [];
+
+    return res.status(200).json({
+      success: true,
+      message: "Earning logs retrieved successfully",
+      data: {
+        totalEarnings: user.totalEarnings || 0,
+        earningLogs: sortedEarningLogs,
+        totalLogs: sortedEarningLogs.length
+      }
+    });
+  } catch (error) {
+    console.error("Error getting user earning logs:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: "Internal server error", 
+      error: error.message 
+    });
   }
 };

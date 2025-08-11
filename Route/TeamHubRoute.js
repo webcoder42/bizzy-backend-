@@ -1,46 +1,41 @@
 import express from "express";
-import { requireSignIn } from "./../middleware/UserMiddleware.js";
-import {
-  addMemberByEmail,
-  checkUserTeamStatus,
-  createTeam,
-  getAllTeamMembers,
-  getAllTeamMessages,
-  getTeamSettings,
+import { 
+  createTeam, 
+  getUserTeams, 
+  updateTeam, 
+  deleteTeam, 
+  getTeamById,
+  sendChatMessage,
+  addUserToTeam,
+  removeUserFromTeam,
+  promoteUserToAdmin,
+  demoteUserFromAdmin,
   getTeamTasks,
-  sendTeamMessage,
+  createTeamTask,
+  updateTeamTask,
   updateTeamSettings,
-  uploadTaskToTeam,
-  updateTaskStatus,
-  kickMember,
-  deleteTeam,
-  leaveTeam,
+  leaveTeam
 } from "../Controller.js/TeamHubController.js";
+import { requireSignIn } from "../middleware/UserMiddleware.js";
 
 const router = express.Router();
 
 router.post("/create", requireSignIn, createTeam);
+router.get("/my-teams", requireSignIn, getUserTeams);
+router.get("/team/:teamId", requireSignIn, getTeamById);
+router.put("/update/:teamId", requireSignIn, updateTeam);
+router.delete("/delete/:teamId", requireSignIn, deleteTeam);
 
-router.get("/check-status", requireSignIn, checkUserTeamStatus);
+router.post("/team/:teamId/chat", requireSignIn, sendChatMessage);
+router.post("/team/:teamId/add-user", requireSignIn, addUserToTeam);
+router.delete("/team/:teamId/remove-user/:userId", requireSignIn, removeUserFromTeam);
+router.put("/team/:teamId/promote-user/:userId", requireSignIn, promoteUserToAdmin);
+router.put("/team/:teamId/demote-user/:userId", requireSignIn, demoteUserFromAdmin);
 
-router.post("/add-by-email", requireSignIn, addMemberByEmail);
-router.get("/members", requireSignIn, getAllTeamMembers);
-
-router.put("/team-settings", requireSignIn, updateTeamSettings);
-
-router.post("/team-send-message", requireSignIn, sendTeamMessage);
-
-router.get("/team-settings", requireSignIn, getTeamSettings);
-router.get("/team-chat", requireSignIn, getAllTeamMessages);
-
-router.post("/task-upload", requireSignIn, uploadTaskToTeam);
-router.get("/team/tasks", requireSignIn, getTeamTasks);
-router.put("/task/status", requireSignIn, updateTaskStatus);
-
-router.post("/kick-member", requireSignIn, kickMember);
-
-router.delete("/delete-team", requireSignIn, deleteTeam);
-
-router.delete("/leave-team", requireSignIn, leaveTeam);
+router.get("/team/:teamId/tasks", requireSignIn, getTeamTasks);
+router.post("/team/:teamId/tasks", requireSignIn, createTeamTask);
+router.put("/team/:teamId/tasks/:taskId", requireSignIn, updateTeamTask);
+router.put("/team/:teamId/settings", requireSignIn, updateTeamSettings);
+router.post("/team/:teamId/leave", requireSignIn, leaveTeam);
 
 export default router;
