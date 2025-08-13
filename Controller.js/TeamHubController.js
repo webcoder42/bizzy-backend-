@@ -4,6 +4,37 @@ import PlanSxhemaModel from "../Model/PlanSxhemaModel.js";
 import UserModel from "../Model/UserModel.js";
 
 import SiteSettings from '../Model/SiteSettingsModel.js';
+
+// Helper function to check if team plan is expired
+const checkTeamPlanStatus = async (userId) => {
+  try {
+    const activePlan = await PlanPurchaseModel.findOne({
+      user: userId,
+      status: "approved",
+    }).populate("plan");
+
+    if (!activePlan) {
+      return { isExpired: true, plan: null, message: "No active plan found" };
+    }
+
+    const now = new Date();
+    const endDate = new Date(activePlan.endDate);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const planEndDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+    const isExpired = planEndDate < today;
+    const isTeamPlan = activePlan.plan.planPurpose === "team";
+
+    return {
+      isExpired: isExpired || !isTeamPlan,
+      plan: activePlan,
+      message: isExpired ? "Plan has expired" : !isTeamPlan ? "Not a team plan" : null
+    };
+  } catch (error) {
+    console.error("Error checking team plan status:", error);
+    return { isExpired: true, plan: null, message: "Error checking plan status" };
+  }
+};
 export const createTeam = async (req, res) => {
   try {
     const { name, description, logo } = req.body;
@@ -238,10 +269,23 @@ export const getTeamById = async (req, res) => {
       });
     }
 
+    // Check team plan status
+    const planStatus = await checkTeamPlanStatus(team.createdBy.toString());
+    
+    // Add plan status to team object
+    const teamWithPlanStatus = {
+      ...team.toObject(),
+      planStatus: {
+        isExpired: planStatus.isExpired,
+        message: planStatus.message,
+        plan: planStatus.plan
+      }
+    };
+
     res.status(200).json({
       success: true,
       message: "Team fetched successfully",
-      team: team,
+      team: teamWithPlanStatus,
     });
   } catch (error) {
     console.error("Error fetching team:", error);
@@ -288,6 +332,15 @@ export const sendChatMessage = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "You don't have access to this team",
+      });
+    }
+
+    // Check team plan status for creator
+    const planStatus = await checkTeamPlanStatus(team.createdBy.toString());
+    if (planStatus.isExpired) {
+      return res.status(403).json({
+        success: false,
+        message: isCreator ? "Your team plan has expired. Please activate your plan first." : "Team plan has expired. Please wait for admin to activate the plan.",
       });
     }
 
@@ -362,6 +415,15 @@ export const addUserToTeam = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "Only team creator and admins can add users",
+      });
+    }
+
+    // Check team plan status for creator
+    const planStatus = await checkTeamPlanStatus(team.createdBy.toString());
+    if (planStatus.isExpired) {
+      return res.status(403).json({
+        success: false,
+        message: isCreator ? "Your team plan has expired. Please activate your plan first." : "Team plan has expired. Please wait for admin to activate the plan.",
       });
     }
 
@@ -663,6 +725,15 @@ export const createTeamTask = async (req, res) => {
       });
     }
 
+    // Check team plan status for creator
+    const planStatus = await checkTeamPlanStatus(team.createdBy.toString());
+    if (planStatus.isExpired) {
+      return res.status(403).json({
+        success: false,
+        message: isCreator ? "Your team plan has expired. Please activate your plan first." : "Team plan has expired. Please wait for admin to activate the plan.",
+      });
+    }
+
     // Validate assigned user if provided
     let assignedTo = null;
     if (assignedToUserId) {
@@ -766,12 +837,26 @@ export const updateTeamTask = async (req, res) => {
       member.user.toString() === userId.toString() || member.user === userId
     );
     const isCreator = team.createdBy.toString() === userId.toString() || team.createdBy === userId;
+    const isAdmin = team.members.some(member => 
+      member.user.toString() === userId.toString() && member.role === 'admin'
+    );
 
     if (!isMember && !isCreator) {
       return res.status(403).json({
         success: false,
         message: "You don't have access to this team",
       });
+    }
+
+    // Check team plan status for creator (only if creator or admin is updating)
+    if (isCreator || isAdmin) {
+      const planStatus = await checkTeamPlanStatus(team.createdBy.toString());
+      if (planStatus.isExpired) {
+        return res.status(403).json({
+          success: false,
+          message: isCreator ? "Your team plan has expired. Please activate your plan first." : "Team plan has expired. Please wait for admin to activate the plan.",
+        });
+      }
     }
 
     const task = team.tasks.id(taskId);
@@ -914,6 +999,15 @@ export const updateTeamSettings = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "Only team creator and admins can update settings",
+      });
+    }
+
+    // Check team plan status for creator
+    const planStatus = await checkTeamPlanStatus(team.createdBy.toString());
+    if (planStatus.isExpired) {
+      return res.status(403).json({
+        success: false,
+        message: isCreator ? "Your team plan has expired. Please activate your plan first." : "Team plan has expired. Please wait for admin to activate the plan.",
       });
     }
 

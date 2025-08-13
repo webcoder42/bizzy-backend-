@@ -1,4 +1,4 @@
-// server/services/PayTabsService.js
+  // server/services/PayTabsService.js
 import axios from 'axios';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
@@ -43,7 +43,9 @@ class PayTabsService {
       String(currency || '').trim()
     ];
     const signatureString = parts.join('');
+    console.log('Signature string:', signatureString);
     const signature = crypto.createHash('sha256').update(signatureString).digest('hex');
+    console.log('Generated signature:', signature);
     return signature;
   }
 
@@ -74,8 +76,28 @@ class PayTabsService {
         throw new Error('Missing required paymentData fields: amount, referenceNumber, customerEmail are required.');
       }
 
-      // Generate signature for request
-      const signature = this.generateSignature(customerEmail, serverKey, referenceNumber, amount, currency);
+      // Validate amount
+      const numericAmount = parseFloat(amount);
+      if (isNaN(numericAmount) || numericAmount <= 0) {
+        throw new Error('Invalid amount provided. Amount must be a positive number.');
+      }
+
+      // Check minimum amount (PayTabs might have minimum requirements)
+      if (numericAmount < 1) {
+        throw new Error('Amount must be at least 1 PKR.');
+      }
+
+      // Generate signature for request - PayTabs requires merchant email in signature
+      const merchantEmail = process.env.PAYTAB_MERCHANT_EMAIL || customerEmail;
+      const formattedAmount = parseFloat(amount).toFixed(2);
+      const signature = this.generateSignature(merchantEmail, serverKey, referenceNumber, formattedAmount, currency);
+      console.log('Signature generation params:', {
+        merchantEmail,
+        serverKey: serverKey ? '***' + serverKey.slice(-4) : 'undefined',
+        referenceNumber,
+        amount: formattedAmount,
+        currency
+      });
 
       const payload = {
         profile_id: parseInt(profileId, 10),
@@ -83,13 +105,14 @@ class PayTabsService {
         tran_class: 'ecom',
         cart_id: referenceNumber,
         cart_description: 'Add Funds to Account',
-        cart_currency: 'PKR', // <-- **Make sure this is string 'PKR'**
-        cart_amount: parseFloat(amount),
+        cart_currency: currency || 'PKR',
+        cart_amount: parseFloat(amount).toFixed(2),
         cart_tax: 0,
         cart_tax_percentage: 0,
         cart_discount: 0,
         cart_discount_percentage: 0,
-        cart_total: parseFloat(amount),
+        cart_total: parseFloat(amount).toFixed(2),
+        tran_total: parseFloat(amount).toFixed(2),
         customer_details: {
           name: customerName || '',
           email: customerEmail,
@@ -111,10 +134,12 @@ class PayTabsService {
           zip: customerZip || ''
         },
         return: returnUrl || (process.env.CLIENT_URL ? `${process.env.CLIENT_URL}/` : 'http://localhost:3000/'),
-        callback: callbackUrl || (process.env.SERVER_URL ? `${process.env.SERVER_URL}/planpurchase/paytabs-callback` : 'http://localhost:5000/planpurchase/paytabs-callback'),
+        callback: callbackUrl || (process.env.SERVER_URL ? `${process.env.SERVER_URL}/api/v1/planpurchase/paytabs-callback` : 'http://localhost:5000/api/v1/planpurchase/paytabs-callback'),
         hide_shipping: true,
         is_framed: false,
         is_hosted: true,
+        show_billing_info: false,
+        show_shipping_info: false,
         signature
       };
 
@@ -125,15 +150,42 @@ class PayTabsService {
         'Authorization': serverKey // **No Bearer prefix**
       };
 
+      console.log('Making request to PayTabs API:', `${this.baseUrl}/payment/request`);
+      console.log('Request headers:', headers);
+      
       const response = await axios.post(`${this.baseUrl}/payment/request`, payload, {
         headers,
         timeout: 15000
       });
 
+      console.log('PayTabs API response:', response.data);
+      
+      // Validate the response
+      if (response.data.tran_total === '0' || response.data.tran_total === 0) {
+        console.error('PayTabs returned zero transaction total. This might indicate a configuration issue.');
+        console.error('Response details:', {
+          cart_amount: response.data.cart_amount,
+          tran_total: response.data.tran_total,
+          profile_id: response.data.profileId,
+          tran_ref: response.data.tran_ref
+        });
+      }
+      
       return response.data;
     } catch (error) {
+      console.error('PayTabs createPaymentPage error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers
+        }
+      });
+      
       const apiErr = error?.response?.data || error?.message || error;
-      console.error('PayTabs createPaymentPage error:', apiErr);
       throw new Error(typeof apiErr === 'string' ? apiErr : (apiErr?.message || 'Failed to create PayTabs payment page'));
     }
   }

@@ -337,20 +337,22 @@ export const addFunds = async (req, res) => {
       
       const paymentData = {
         amount: amount,
-        currency: 'USD',
+        currency: 'PKR', // Changed to PKR to match PayTabs profile
         referenceNumber: referenceNumber,
         customerEmail: user.email,
         customerName: user.name || user.username,
         customerPhone: user.phone || '',
         customerAddress: user.address || '',
         customerCity: user.city || '',
-        customerCountry: user.country || 'US',
+        customerCountry: user.country || 'PK', // Changed to PK for Pakistan
         customerZip: user.zipCode || '',
         returnUrl: `${process.env.CLIENT_URL || 'http://localhost:3000'}/B/a9fd38c3-4731-4e97-ae6e-83a4c8f8bd2e/dashboard/client/paytabs-verification?ref=${referenceNumber}`,
-        callbackUrl: `${process.env.SERVER_URL || 'http://localhost:5000'}/planpurchase/paytabs-callback`
+        callbackUrl: `${process.env.SERVER_URL || 'http://localhost:5000'}/api/v1/planpurchase/paytabs-callback`
       };
 
       const paytabsResponse = await PayTabsService.createPaymentPage(paymentData);
+      
+      console.log('PayTabs response in controller:', paytabsResponse);
       
       if (paytabsResponse.redirect_url) {
         return res.status(200).json({
@@ -359,7 +361,8 @@ export const addFunds = async (req, res) => {
           message: "Redirect to PayTabs payment page"
         });
       } else {
-        throw new Error('Failed to create PayTabs payment page');
+        console.error('No redirect_url in PayTabs response:', paytabsResponse);
+        throw new Error('Failed to create PayTabs payment page - no redirect URL');
       }
     } else {
       return res.status(400).json({ message: "Invalid payment method. Supported methods: card, paytabs" });
