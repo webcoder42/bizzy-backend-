@@ -11,13 +11,16 @@ import {
   getAllTimeMonthlyPurchases,
   getAllPlanPurchases,
   payTabsCallback,
-  verifyPayTabsPayment
+  verifyPayTabsPayment,
+  checkActivePlan
 } from "../Controller.js/PlanPurchaseController.js";
 import { requireSignIn } from "../middleware/UserMiddleware.js";
 
 const router = express.Router();
 
 router.post("/purchase", requireSignIn, createPlanPurchase);
+
+router.get("/check-active-plan", requireSignIn, checkActivePlan);
 
 router.post("/team-purchase", requireSignIn, teamPlanPurchase);
 

@@ -7,6 +7,168 @@ import nodemailer from "nodemailer";
 import UserModel from "../Model/UserModel.js";
 import sanitize from "mongo-sanitize";
 import { v4 as uuidv4 } from "uuid";
+import filter from 'leo-profanity';
+
+// === Bad Words Filter Setup ===
+const customBadWords = [
+  'sex', 'fuck', 'shit', 'bitch', 'asshole', 'damn', 'bastard', 'whore', 'slut',
+  'chutiya', 'bhenchod', 'madarchod', 'randi', 'harami', 'kamina', 'kutta', 'saala', 'behenchod',
+  'gaandu', 'randii', 'bhen chod', 'ma chod', 'bhosdike', 'lodu', 'chodu', 'kutiya',
+  'f*ck', 'sh*t', 'b*tch', 'a**hole', 'ch*tiya', 'r*ndi'
+];
+
+filter.add(customBadWords);
+
+const containsInappropriateContent = (text) => {
+  if (!text || typeof text !== 'string') return false;
+  return filter.check(text.toLowerCase());
+};
+
+// Function to send warning email for profile violations
+const sendProfileWarningEmail = async (userEmail, userName, warningCount) => {
+  const subject = "⚠️ Warning: Inappropriate Content in Profile - BiZy";
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;background:#fff;border-radius:10px;padding:32px 24px;box-shadow:0 2px 12px #0001;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <img src='https://i.ibb.co/6bQ7QwM/logo512.png' alt='BiZy Logo' style='width:80px;height:80px;border-radius:16px;margin-bottom:8px;' />
+        <h2 style="color:#ff4d4f;">⚠️ Profile Content Policy Warning</h2>
+      </div>
+      <p>Dear <b>${userName}</b>,</p>
+      <p>We detected inappropriate content in your recent profile update.</p>
+      
+      <div style="background:#fff2f0;border-left:4px solid #ff4d4f;padding:16px;margin:16px 0;">
+        <p><b>Warning Count: ${warningCount}/2</b></p>
+        <p style="color:#ff4d4f;font-weight:bold;">
+          ${warningCount === 1 ? 
+            "This is your FIRST warning. Please maintain professional language in your profile." : 
+            "This is your FINAL warning. Next violation will result in account suspension!"
+          }
+        </p>
+      </div>
+
+      <p><b>Professional Profile Guidelines:</b></p>
+      <ul>
+        <li>Use appropriate language in your name, bio, and portfolio descriptions</li>
+        <li>Maintain professional communication standards</li>
+        <li>Avoid offensive or inappropriate content</li>
+        <li>Present yourself professionally to potential clients</li>
+      </ul>
+      
+      <br/>
+      <p style="color:#5a6bff;font-weight:bold;">BiZy Team</p>
+    </div>
+  `;
+  
+  try {
+    // Use existing transporter (assuming it's available globally)
+    const transporter = nodemailer.createTransporter({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+    
+    await transporter.sendMail({
+      from: 'BiZy Freelancing <bizy83724@gmail.com>',
+      to: userEmail,
+      subject,
+      html,
+    });
+  } catch (error) {
+    console.error("❌ Profile warning email sending failed:", error);
+  }
+};
+
+const sendProfileSuspensionEmail = async (userEmail, userName) => {
+  const subject = "🚫 Account Suspended - BiZy";
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;background:#fff;border-radius:10px;padding:32px 24px;box-shadow:0 2px 12px #0001;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <img src='https://i.ibb.co/6bQ7QwM/logo512.png' alt='BiZy Logo' style='width:80px;height:80px;border-radius:16px;margin-bottom:8px;' />
+        <h2 style="color:#ff4d4f;">🚫 Account Suspended</h2>
+      </div>
+      <p>Dear <b>${userName}</b>,</p>
+      <p>Your BiZy account has been <b style="color:#ff4d4f;">SUSPENDED</b> due to repeated inappropriate content violations in your profile.</p>
+      
+      <div style="background:#fff2f0;border-left:4px solid #ff4d4f;padding:16px;margin:16px 0;">
+        <p><b>Reason:</b> Multiple inappropriate content violations in profile</p>
+        <p><b>Status:</b> Account access temporarily restricted</p>
+      </div>
+      
+      <p><b>What happens now:</b></p>
+      <ul>
+        <li>Your profile access is temporarily suspended</li>
+        <li>You cannot update your profile or apply to projects</li>
+        <li>Contact support for account review</li>
+      </ul>
+      
+      <br/>
+      <p style="color:#5a6bff;font-weight:bold;">BiZy Support Team</p>
+    </div>
+  `;
+  
+  try {
+    const transporter = nodemailer.createTransporter({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+    
+    await transporter.sendMail({
+      from: 'BiZy Freelancing <bizy83724@gmail.com>',
+      to: userEmail,
+      subject,
+      html,
+    });
+  } catch (error) {
+    console.error("❌ Profile suspension email sending failed:", error);
+  }
+};
+
+const handleProfileContentViolation = async (userId, content, violationType) => {
+  try {
+    const user = await UserModel.findById(userId);
+    if (!user) return { suspended: false, warningCount: 0 };
+
+    if (!user.warnings || !user.warnings.inappropriateContent) {
+      user.warnings = {
+        inappropriateContent: {
+          count: 0,
+          warningHistory: []
+        }
+      };
+    }
+
+    user.warnings.inappropriateContent.count += 1;
+    user.warnings.inappropriateContent.lastWarningDate = new Date();
+    
+    user.warnings.inappropriateContent.warningHistory.push({
+      date: new Date(),
+      reason: violationType,
+      content: content.substring(0, 100)
+    });
+
+    const warningCount = user.warnings.inappropriateContent.count;
+
+    if (warningCount >= 2) {
+      user.accountStatus = "suspended";
+      await user.save();
+      await sendProfileSuspensionEmail(user.email, user.Fullname || user.username);
+      return { suspended: true, warningCount };
+    } else {
+      await user.save();
+      await sendProfileWarningEmail(user.email, user.Fullname || user.username, warningCount);
+      return { suspended: false, warningCount };
+    }
+  } catch (error) {
+    console.error("Error handling profile content violation:", error);
+    return { suspended: false, warningCount: 0 };
+  }
+};
+
 /* 
 =============================================
 REGISTRATION-SPECIFIC UTILITIES AND STORAGE
@@ -949,9 +1111,114 @@ export const updateUserProfile = async (req, res) => {
     const userId = req.user.id;
     const updates = req.body;
 
+    // ✅ Check if user account is suspended before allowing updates
+    const currentUser = await UserModel.findById(userId);
+    if (!currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (currentUser.accountStatus === "suspended") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is suspended. You cannot update your profile. Please contact support.",
+        code: "ACCOUNT_SUSPENDED",
+        forceLogout: true
+      });
+    }
+
     // Debug log for portfolio
     if (updates.portfolio) {
       console.log('Received portfolio for update:', JSON.stringify(updates.portfolio, null, 2));
+    }
+
+    // ✅ Content Validation - Check for inappropriate words in profile fields
+    const fieldsToCheck = [
+      { field: 'Fullname', value: updates.Fullname, displayName: 'Full Name' },
+      { field: 'bio', value: updates.bio, displayName: 'Bio' },
+      { field: 'username', value: updates.username, displayName: 'Username' }
+    ];
+
+    for (const { field, value, displayName } of fieldsToCheck) {
+      if (value && containsInappropriateContent(value)) {
+        const violation = await handleProfileContentViolation(userId, value, `Inappropriate content in profile ${field}`);
+        
+        console.warn(`🚨 Inappropriate content detected in profile ${field} - User ID: ${userId}`);
+        
+        if (violation.suspended) {
+          return res.status(403).json({
+            success: false,
+            message: "Your account has been suspended due to repeated inappropriate content violations. Please contact support.",
+            code: "ACCOUNT_SUSPENDED",
+            warningCount: violation.warningCount,
+            forceLogout: true
+          });
+        }
+        
+        return res.status(400).json({
+          success: false,
+          message: `Warning ${violation.warningCount}/2: Your ${displayName} contains inappropriate content. ${violation.warningCount === 1 ? 'This is your first warning.' : 'This is your final warning - next violation will suspend your account!'} Please revise and try again.`,
+          code: `INAPPROPRIATE_CONTENT_${field.toUpperCase()}`,
+          warningCount: violation.warningCount,
+          isWarning: true,
+          field: field
+        });
+      }
+    }
+
+    // Check portfolio items for inappropriate content
+    if (updates.portfolio && Array.isArray(updates.portfolio)) {
+      for (let i = 0; i < updates.portfolio.length; i++) {
+        const item = updates.portfolio[i];
+        
+        if (item.title && containsInappropriateContent(item.title)) {
+          const violation = await handleProfileContentViolation(userId, item.title, `Inappropriate content in portfolio title`);
+          
+          if (violation.suspended) {
+            return res.status(403).json({
+              success: false,
+              message: "Your account has been suspended due to repeated inappropriate content violations. Please contact support.",
+              code: "ACCOUNT_SUSPENDED",
+              warningCount: violation.warningCount,
+              forceLogout: true
+            });
+          }
+          
+          return res.status(400).json({
+            success: false,
+            message: `Warning ${violation.warningCount}/2: Portfolio item #${i + 1} title contains inappropriate content. Please revise and try again.`,
+            code: "INAPPROPRIATE_CONTENT_PORTFOLIO",
+            warningCount: violation.warningCount,
+            isWarning: true,
+            field: 'portfolio'
+          });
+        }
+        
+        if (item.description && containsInappropriateContent(item.description)) {
+          const violation = await handleProfileContentViolation(userId, item.description, `Inappropriate content in portfolio description`);
+          
+          if (violation.suspended) {
+            return res.status(403).json({
+              success: false,
+              message: "Your account has been suspended due to repeated inappropriate content violations. Please contact support.",
+              code: "ACCOUNT_SUSPENDED",
+              warningCount: violation.warningCount,
+              forceLogout: true
+            });
+          }
+          
+          return res.status(400).json({
+            success: false,
+            message: `Warning ${violation.warningCount}/2: Portfolio item #${i + 1} description contains inappropriate content. Please revise and try again.`,
+            code: "INAPPROPRIATE_CONTENT_PORTFOLIO",
+            warningCount: violation.warningCount,
+            isWarning: true,
+            field: 'portfolio'
+          });
+        }
+      }
     }
 
     // Remove restricted fields
@@ -1311,7 +1578,7 @@ export const deleteUserById = async (req, res) => {
   }
 };
 
-// Get complete user details by ID
+// Get complete user details by ID (Admin only)
 export const getUserCompleteDetails = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1341,6 +1608,8 @@ export const getUserCompleteDetails = async (req, res) => {
       profileImage: user.profileImage,
       role: user.role,
       UserType: user.UserType,
+      isVerified: user.isVerified,
+      accountStatus: user.accountStatus,
       bio: user.bio,
       skills: user.skills,
       location: user.location,
@@ -1349,6 +1618,7 @@ export const getUserCompleteDetails = async (req, res) => {
       socialLinks: user.socialLinks,
       portfolio: user.portfolio,
       rating: user.rating,
+      reviewCount: user.reviewCount,
       completedProjects: user.completedProjects,
       totalEarnings: user.totalEarnings,
       totalSpend: user.totalSpend,
@@ -1361,7 +1631,6 @@ export const getUserCompleteDetails = async (req, res) => {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       lastLogin: user.lastLogin,
-      // Add any other fields you want to include
     };
 
     return res.status(200).json({
@@ -1371,6 +1640,63 @@ export const getUserCompleteDetails = async (req, res) => {
     });
   } catch (error) {
     console.error("Get user complete details error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// Get public user profile by ID (for clients to view applicant profiles)
+export const getPublicUserProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find user and exclude sensitive fields
+    const user = await UserModel.findById(id)
+      .select("-password -googleId -loginHistory -addFundLogs -EarningLogs -warnings -referralCode -referralLink -totalReferred")
+      .populate("referredBy", "username email profileImage");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Prepare the public user data response (exclude sensitive financial info)
+    const userData = {
+      _id: user._id,
+      Fullname: user.Fullname,
+      username: user.username,
+      email: user.email,
+      profileImage: user.profileImage,
+      UserType: user.UserType,
+      bio: user.bio,
+      skills: user.skills,
+      location: user.location,
+      socialLinks: user.socialLinks,
+      portfolio: user.portfolio,
+      rating: user.rating,
+      reviewCount: user.reviewCount,
+      completedProjects: user.completedProjects,
+      availability: user.availability,
+      responseTimeRating: user.responseTimeRating,
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin,
+      languages: user.languages,
+      experience: user.experience,
+      education: user.education,
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "Public user profile retrieved successfully",
+      user: userData,
+    });
+  } catch (error) {
+    console.error("Get public user profile error:", error);
     return res.status(500).json({
       success: false,
       message: "Internal server error",

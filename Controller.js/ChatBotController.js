@@ -5,7 +5,8 @@ import {
   getBizyInfo,
   BiZZyKnowledgeBase,
 } from "../Helper/BiZyKnowledgeBase.js";
-
+import dotenv from 'dotenv'
+dotenv.config();
 // Enhanced fee calculation helper
 const calculateFees = (message) => {
   // Detect deposit amounts
@@ -482,6 +483,239 @@ const getKnowledgeBasedResponse = (message) => {
   }
 
   return null;
+};
+
+export const getDailyProposalCount = async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayEnd = new Date(today);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Count today's proposals for this user
+    const todayProposalCount = await ChatBotModel.countDocuments({
+      userId: userId,
+      isProposal: true,
+      createdAt: {
+        $gte: today,
+        $lte: todayEnd
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      count: todayProposalCount,
+      remaining: Math.max(0, 5 - todayProposalCount),
+      maxDaily: 5
+    });
+
+  } catch (error) {
+    console.error("Error getting daily proposal count:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get proposal count"
+    });
+  }
+};
+
+export const generateProposal = async (req, res) => {
+  const { 
+    projectTitle, 
+    projectDescription, 
+    projectSkills, 
+    projectBudget, 
+    projectCategory,
+    experienceRequired,
+    problemsToSolve,
+    userSkills,
+    userName,
+    userExperience
+  } = req.body;
+  const userId = req.user.id;
+  const username = req.user.username;
+
+  try {
+    // Check if user has active plan
+    const PlanPurchaseModel = (await import("../Model/PlanPurchaseModel.js")).default;
+    const activePlan = await PlanPurchaseModel.findOne({
+      user: userId,
+      status: "approved"
+    });
+
+    // If no active plan, check daily limit
+    if (!activePlan) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const todayEnd = new Date(today);
+      todayEnd.setHours(23, 59, 59, 999);
+
+      // Count today's proposals for this user
+      const todayProposalCount = await ChatBotModel.countDocuments({
+        userId: userId,
+        isProposal: true,
+        createdAt: {
+          $gte: today,
+          $lte: todayEnd
+        }
+      });
+
+      if (todayProposalCount >= 5) {
+        return res.status(403).json({
+          success: false,
+          message: "Daily limit reached! You can generate 5 proposals per day without an active plan. Upgrade your plan for unlimited AI proposal generation.",
+          dailyLimit: true,
+          usedToday: todayProposalCount,
+          maxDaily: 5
+        });
+      }
+    }
+
+    const skillsMatch = userSkills.filter(userSkill => 
+      projectSkills.some(projectSkill => 
+        projectSkill.toLowerCase().includes(userSkill.toLowerCase()) || 
+        userSkill.toLowerCase().includes(projectSkill.toLowerCase())
+      )
+    );
+
+    // Enhanced matching and analysis
+    const experienceYears = userExperience || '3+ years';
+    const isExperienceMatch = experienceRequired && 
+      parseInt(experienceRequired) <= parseInt(experienceYears);
+    
+    const specificRequirements = [];
+    if (projectDescription.toLowerCase().includes('stripe')) {
+      specificRequirements.push('Stripe payment integration');
+    }
+    if (projectDescription.toLowerCase().includes('restapi') || projectDescription.toLowerCase().includes('rest api')) {
+      specificRequirements.push('RESTful API development');
+    }
+    if (projectDescription.toLowerCase().includes('secure') || projectDescription.toLowerCase().includes('security')) {
+      specificRequirements.push('Security implementation');
+    }
+    if (projectDescription.toLowerCase().includes('mern')) {
+      specificRequirements.push('MERN stack development');
+    }
+    if (projectDescription.toLowerCase().includes('debug') || projectDescription.toLowerCase().includes('fix')) {
+      specificRequirements.push('debugging and error fixing');
+    }
+
+    const prompt = `Create a highly personalized, professional freelance proposal based on these specific requirements:
+
+PROJECT DETAILS:
+Title: ${projectTitle}
+Description: ${projectDescription}
+Required Experience: ${experienceRequired || 'Professional level'}
+Budget: $${projectBudget}
+Required Skills: ${projectSkills?.join(', ') || 'Not specified'}
+Problems to Solve: ${problemsToSolve || 'Not specified'}
+Category: ${projectCategory || 'Development'}
+
+MY QUALIFICATIONS:
+- Name: ${userName || 'Professional Developer'}
+- Experience: ${experienceYears} of professional experience
+- Skills: ${userSkills?.join(', ') || 'Full-stack development'}
+- Matching Skills: ${skillsMatch.length > 0 ? skillsMatch.join(', ') : 'General development expertise'}
+- Experience Match: ${isExperienceMatch ? 'YES - I meet the experience requirements' : 'I have relevant experience'}
+
+SPECIFIC REQUIREMENTS IDENTIFIED:
+${specificRequirements.length > 0 ? specificRequirements.map(req => `- ${req}`).join('\n') : '- Custom development solutions'}
+
+WRITE A COMPELLING PROPOSAL THAT:
+1. Directly addresses each specific requirement mentioned
+2. Highlights my ${experienceYears} experience specifically if experience was mentioned
+3. Mentions specific technologies they need (Stripe, REST API, MERN, etc.) if mentioned
+4. Shows I understand their exact problems and can solve them
+5. Provides a clear approach for their specific needs
+6. Demonstrates expertise in the exact skills they require
+7. Is confident and solution-focused (NO questions)
+8. 250-350 words
+9. Ends with strong commitment to deliver results
+
+Make it feel personalized to their exact project, not generic. Reference specific details from their description.`;
+
+    // Check if GROQ API key exists
+    if (!process.env.GROQ_API_KEY) {
+      console.warn("GROQ_API_KEY not found, using fallback proposal");
+      throw new Error("GROQ API key not configured");
+    }
+
+    const groqRes = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "llama-3.1-70b-versatile",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert freelancer proposal writer with deep technical knowledge. Create winning proposals by: 1) Addressing every specific requirement mentioned 2) Demonstrating deep understanding of their tech stack 3) Showing relevant experience clearly 4) Providing a clear solution approach 5) Being confident and direct (NO questions) 6) Making it feel personalized, not templated. Always reference specific technologies, experience requirements, and problems they mentioned. Write in first person and be solution-focused."
+          },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 600,
+        temperature: 0.8,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const proposal = groqRes.data.choices[0].message.content;
+
+    // Save the generated proposal to ChatBot model for tracking
+    const chat = new ChatBotModel({
+      userId: userId || null,
+      message: `Generate AI proposal for: ${projectTitle}`,
+      response: proposal,
+      username,
+      isProposal: true,
+    });
+
+    await chat.save();
+
+    res.status(200).json({ 
+      success: true,
+      proposal: proposal 
+    });
+
+  } catch (error) {
+    console.error("Error generating proposal:", error?.response?.data || error.message);
+    
+    // Calculate skills match for fallback as well
+    const fallbackSkillsMatch = userSkills.filter(userSkill => 
+      projectSkills.some(projectSkill => 
+        projectSkill.toLowerCase().includes(userSkill.toLowerCase()) || 
+        userSkill.toLowerCase().includes(projectSkill.toLowerCase())
+      )
+    );
+
+    // Enhanced fallback proposal template with proper null checks
+    const fallbackProposal = `I'm excited about your ${projectTitle || 'project'} and understand you need ${projectSkills?.length > 0 ? projectSkills.slice(0, 3).join(', ') : 'professional'} expertise${experienceRequired ? ` with ${experienceRequired}` : ''}.
+
+${problemsToSolve ? `I can solve the specific challenges you mentioned: ${problemsToSolve}.` : 'Based on your requirements,'} I have the expertise to deliver exactly what you need. My experience in ${userSkills?.length > 0 ? userSkills.slice(0, 3).join(', ') : 'relevant technologies'} makes me the perfect fit for this project.
+
+My approach will be:
+• Thoroughly understand and analyze your requirements
+• ${projectCategory === 'Web Development' ? 'Develop clean, scalable code with modern best practices' : projectCategory === 'Mobile Development' ? 'Create high-performance mobile applications' : 'Deliver professional solutions using industry standards'}
+• Provide regular progress updates and maintain clear communication
+• Complete the project on time and within your ${projectBudget ? `$${projectBudget}` : 'specified'} budget
+• Ensure quality through thorough testing and optimization
+
+${fallbackSkillsMatch.length > 0 ? `My proven expertise in ${fallbackSkillsMatch.join(', ')} ensures I can handle all aspects of your project effectively.` : ''} I'm committed to delivering exceptional results that exceed your expectations and contribute to your business success.
+
+I'm ready to start immediately and bring your vision to life with professional quality and attention to detail.`;
+
+    res.status(200).json({ 
+      success: true,
+      proposal: fallbackProposal,
+      note: "Generated using enhanced template"
+    });
+  }
 };
 
 export const handleUserChat = async (req, res) => {

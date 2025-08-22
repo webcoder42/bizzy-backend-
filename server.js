@@ -30,6 +30,9 @@ import SiteSettingsRoute from "./Route/SiteSettingsRoute.js";
 import AutoCompletionRoute from "./Route/AutoCompletionRoute.js";
 import ActivityRoute from "./Route/ActivityRoute.js";
 import TeamHubRoute from "./Route/TeamHubRoute.js";
+import AdminAnalyticsRoute from "./Route/AdminAnalyticsRoute.js";
+import ProjectSellRoute from "./Route/ProjectSellRoute.js";
+import ProjectPurchaseRoute from "./Route/ProjectPurchaseRoute.js";
 import { setupSocketIO } from "./Controller.js/MessageController.js";
 import { initializeCronJobs } from "./services/CronScheduler.js";
 import { initializeActivityTracking } from "./services/ActivityTrackingService.js";
@@ -88,11 +91,15 @@ app.use(hpp());
 app.use(xss());
 app.use(morgan("dev"));
 
+
+
 // Uploads folder setup
 const uploadsDir = path.join(__dirname, "uploads");
 const cvsDir = path.join(uploadsDir, "cvs");
+const projectImagesDir = path.join(uploadsDir, "project-images");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 if (!fs.existsSync(cvsDir)) fs.mkdirSync(cvsDir, { recursive: true });
+if (!fs.existsSync(projectImagesDir)) fs.mkdirSync(projectImagesDir, { recursive: true });
 // Allow CORS for static files
 app.use("/uploads", (req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -122,6 +129,11 @@ app.use("/api/site-settings", SiteSettingsRoute);
 app.use("/api/v1/auto-completion", AutoCompletionRoute);
 app.use("/api/v1/activity", ActivityRoute);
 app.use("/api/v1/teamhub", TeamHubRoute);
+app.use("/api/v1/admin-analytics", AdminAnalyticsRoute);
+console.log('Registering project-sell routes...');
+app.use("/api/v1/project-sell", ProjectSellRoute);
+console.log('Registering project-purchase routes...');
+app.use("/api/v1/project-purchase", ProjectPurchaseRoute);
 
 // Root
 app.get("/", (req, res) => {

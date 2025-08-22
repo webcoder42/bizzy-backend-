@@ -11,6 +11,43 @@ import PayTabsService from "../services/PayTabsService.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+export const checkActivePlan = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Check if user has any active (approved) plan
+    const activePlan = await PlanPurchaseModel.findOne({
+      user: userId,
+      status: "approved"
+    }).populate('plan');
+
+    if (activePlan) {
+      return res.status(200).json({
+        success: true,
+        hasActivePlan: true,
+        activePlan: {
+          planName: activePlan.plan.planName,
+          planType: activePlan.plan.planType,
+          features: activePlan.plan.features,
+          submittedAt: activePlan.submittedAt
+        }
+      });
+    } else {
+      return res.status(200).json({
+        success: true,
+        hasActivePlan: false,
+        message: "No active plan found. Please purchase a plan to access premium features."
+      });
+    }
+  } catch (error) {
+    console.error("Error checking active plan:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while checking plan status"
+    });
+  }
+};
+
 export const createPlanPurchase = async (req, res) => {
   try {
     const { planId, paymentMethod, paymentDetails } = req.body;

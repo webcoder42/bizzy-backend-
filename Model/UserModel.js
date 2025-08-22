@@ -357,6 +357,30 @@ const userSchema = new mongoose.Schema(
       default: "active",
     },
 
+    warnings: {
+      inappropriateContent: {
+        count: {
+          type: Number,
+          default: 0,
+        },
+        lastWarningDate: {
+          type: Date,
+        },
+        warningHistory: [{
+          date: {
+            type: Date,
+            default: Date.now,
+          },
+          reason: {
+            type: String,
+          },
+          content: {
+            type: String,
+          },
+        }],
+      },
+    },
+
     lastLogin: {
       type: Date,
       default: Date.now,

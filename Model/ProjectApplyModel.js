@@ -30,7 +30,7 @@ const projectApplicationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["pending", "rejected", "hired"],
+    enum: ["pending", "rejected", "hired", "cancelled"],
     default: "pending",
   },
   appliedAt: {

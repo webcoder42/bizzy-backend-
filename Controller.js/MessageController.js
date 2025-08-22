@@ -7,6 +7,8 @@ import mongoose from "mongoose";
 
 let ioGlobal = null;
 
+export { ioGlobal };
+
 export const setupSocketIO = (io) => {
   ioGlobal = io;
   io.on("connection", (socket) => {

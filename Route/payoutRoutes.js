@@ -11,6 +11,7 @@ import {
   getPayoutSummary,
   requestWithdrawal,
   getWithdrawalHistory,
+  getUserWithdrawals,
   cancelWithdrawal,
   getAllWithdrawals,
   updateWithdrawalStatus,
@@ -56,6 +57,9 @@ router.delete(
 
 // ADMIN: Get all withdrawals
 router.get("/admin/withdrawals", requireSignIn, isAdmin, getAllWithdrawals);
+
+// ADMIN: Get specific user's withdrawals
+router.get("/admin/user-withdrawals/:userId", requireSignIn, isAdmin, getUserWithdrawals);
 
 // ADMIN: Get withdrawal stats
 router.get(

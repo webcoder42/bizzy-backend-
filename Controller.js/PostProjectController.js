@@ -6,6 +6,125 @@ import SubmitProjectModel from "../Model/SubmitProjectModel.js";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import SiteSettings from "../Model/SiteSettingsModel.js";
+import filter from 'leo-profanity';
+import { ioGlobal } from "./MessageController.js";
+// === Bad Words Filter Setup ===
+const customBadWords = [
+  'sex', 'fuck', 'shit', 'bitch', 'asshole', 'damn', 'bastard', 'whore', 'slut',
+  'chutiya', 'bhenchod', 'madarchod', 'randi', 'harami', 'kamina', 'kutta', 'saala', 'behenchod',
+  'gaandu', 'randii', 'bhen chod', 'ma chod', 'bhosdike', 'lodu', 'chodu', 'kutiya',
+  'f*ck', 'sh*t', 'b*tch', 'a**hole', 'ch*tiya', 'r*ndi'
+];
+
+filter.add(customBadWords);
+
+const containsInappropriateContent = (text) => {
+  if (!text || typeof text !== 'string') return false;
+  return filter.check(text.toLowerCase());
+};
+
+// Warning and suspension functions (same as ProjectApplyController)
+const sendWarningEmail = async (userEmail, userName, warningCount) => {
+  const subject = "⚠️ Warning: Inappropriate Content in Project Post - BiZy";
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;background:#fff;border-radius:10px;padding:32px 24px;box-shadow:0 2px 12px #0001;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <img src='https://i.ibb.co/6bQ7QwM/logo512.png' alt='BiZy Logo' style='width:80px;height:80px;border-radius:16px;margin-bottom:8px;' />
+        <h2 style="color:#ff4d4f;">⚠️ Content Policy Warning</h2>
+      </div>
+      <p>Dear <b>${userName}</b>,</p>
+      <p>We detected inappropriate content in your recent project post.</p>
+      
+      <div style="background:#fff2f0;border-left:4px solid #ff4d4f;padding:16px;margin:16px 0;">
+        <p><b>Warning Count: ${warningCount}/2</b></p>
+        <p style="color:#ff4d4f;font-weight:bold;">
+          ${warningCount === 1 ? 
+            "This is your FIRST warning. Please use professional language in project posts." : 
+            "This is your FINAL warning. Next violation will result in account suspension!"
+          }
+        </p>
+      </div>
+
+      <p><b>Professional Project Posting Guidelines:</b></p>
+      <ul>
+        <li>Use clear, professional language</li>
+        <li>Describe your project requirements respectfully</li>
+        <li>Avoid inappropriate or offensive content</li>
+      </ul>
+      
+      <br/>
+      <p style="color:#5a6bff;font-weight:bold;">BiZy Team</p>
+    </div>
+  `;
+  
+  await sendEmail(userEmail, subject, html);
+};
+
+const sendSuspensionEmail = async (userEmail, userName) => {
+  const subject = "🚫 Account Suspended - BiZy";
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;background:#fff;border-radius:10px;padding:32px 24px;box-shadow:0 2px 12px #0001;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <img src='https://i.ibb.co/6bQ7QwM/logo512.png' alt='BiZy Logo' style='width:80px;height:80px;border-radius:16px;margin-bottom:8px;' />
+        <h2 style="color:#ff4d4f;">🚫 Account Suspended</h2>
+      </div>
+      <p>Dear <b>${userName}</b>,</p>
+      <p>Your BiZy account has been <b style="color:#ff4d4f;">SUSPENDED</b> due to repeated inappropriate content violations in project posts.</p>
+      
+      <div style="background:#fff2f0;border-left:4px solid #ff4d4f;padding:16px;margin:16px 0;">
+        <p><b>Reason:</b> Multiple inappropriate content violations</p>
+        <p><b>Status:</b> Account access temporarily restricted</p>
+      </div>
+      
+      <br/>
+      <p style="color:#5a6bff;font-weight:bold;">BiZy Support Team</p>
+    </div>
+  `;
+  
+  await sendEmail(userEmail, subject, html);
+};
+
+const handleInappropriateContentViolation = async (userId, content, violationType) => {
+  try {
+    const user = await UserModel.findById(userId);
+    if (!user) return { suspended: false, warningCount: 0 };
+
+    if (!user.warnings || !user.warnings.inappropriateContent) {
+      user.warnings = {
+        inappropriateContent: {
+          count: 0,
+          warningHistory: []
+        }
+      };
+    }
+
+    user.warnings.inappropriateContent.count += 1;
+    user.warnings.inappropriateContent.lastWarningDate = new Date();
+    
+    user.warnings.inappropriateContent.warningHistory.push({
+      date: new Date(),
+      reason: violationType,
+      content: content.substring(0, 100)
+    });
+
+    const warningCount = user.warnings.inappropriateContent.count;
+
+    if (warningCount >= 2) {
+      user.accountStatus = "suspended";
+      await user.save();
+      await sendSuspensionEmail(user.email, user.Fullname || user.username);
+      return { suspended: true, warningCount };
+    } else {
+      await user.save();
+      await sendWarningEmail(user.email, user.Fullname || user.username, warningCount);
+      return { suspended: false, warningCount };
+    }
+  } catch (error) {
+    console.error("Error handling inappropriate content violation:", error);
+    return { suspended: false, warningCount: 0 };
+  }
+};
+
 // === Nodemailer Transporter ===
 dotenv.config();
 const transporter = nodemailer.createTransport({
@@ -65,6 +184,79 @@ export const createJobPost = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "All required fields are required",
+      });
+    }
+
+    // ✅ Content Validation - Check for inappropriate words
+    if (containsInappropriateContent(title)) {
+      const violation = await handleInappropriateContentViolation(req.user.id, title, "Inappropriate content in project title");
+      
+      console.warn(`🚨 Inappropriate content detected in project title - User ID: ${req.user.id}, Title: ${title.substring(0, 50)}`);
+      
+      if (violation.suspended) {
+        return res.status(403).json({
+          success: false,
+          message: "Your account has been suspended due to repeated inappropriate content violations. Please contact support.",
+          code: "ACCOUNT_SUSPENDED",
+          warningCount: violation.warningCount,
+          forceLogout: true
+        });
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: `Warning ${violation.warningCount}/2: Your project title contains inappropriate content. ${violation.warningCount === 1 ? 'This is your first warning.' : 'This is your final warning - next violation will suspend your account!'} Please revise and try again.`,
+        code: "INAPPROPRIATE_CONTENT_TITLE",
+        warningCount: violation.warningCount,
+        isWarning: true
+      });
+    }
+
+    if (containsInappropriateContent(description)) {
+      const violation = await handleInappropriateContentViolation(req.user.id, description, "Inappropriate content in project description");
+      
+      console.warn(`🚨 Inappropriate content detected in project description - User ID: ${req.user.id}`);
+      
+      if (violation.suspended) {
+        return res.status(403).json({
+          success: false,
+          message: "Your account has been suspended due to repeated inappropriate content violations. Please contact support.",
+          code: "ACCOUNT_SUSPENDED",
+          warningCount: violation.warningCount,
+          forceLogout: true
+        });
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: `Warning ${violation.warningCount}/2: Your project description contains inappropriate content. ${violation.warningCount === 1 ? 'This is your first warning.' : 'This is your final warning - next violation will suspend your account!'} Please revise and try again.`,
+        code: "INAPPROPRIATE_CONTENT_DESCRIPTION",
+        warningCount: violation.warningCount,
+        isWarning: true
+      });
+    }
+
+    if (containsInappropriateContent(problems)) {
+      const violation = await handleInappropriateContentViolation(req.user.id, problems, "Inappropriate content in project problems section");
+      
+      console.warn(`🚨 Inappropriate content detected in project problems - User ID: ${req.user.id}`);
+      
+      if (violation.suspended) {
+        return res.status(403).json({
+          success: false,
+          message: "Your account has been suspended due to repeated inappropriate content violations. Please contact support.",
+          code: "ACCOUNT_SUSPENDED",
+          warningCount: violation.warningCount,
+          forceLogout: true
+        });
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: `Warning ${violation.warningCount}/2: Your project problems section contains inappropriate content. ${violation.warningCount === 1 ? 'This is your first warning.' : 'This is your final warning - next violation will suspend your account!'} Please revise and try again.`,
+        code: "INAPPROPRIATE_CONTENT_PROBLEMS",
+        warningCount: violation.warningCount,
+        isWarning: true
       });
     }
 
@@ -284,6 +476,50 @@ export const updateJobPost = async (req, res) => {
       const refundAmount = (job.budget * 90) / 100; // 90% of budget
       user.totalEarnings += refundAmount;
       await user.save();
+
+      // Find and notify hired freelancer about project cancellation
+      const hiredApplication = await ProjectApplyModel.findOne({
+        project: job._id,
+        status: "hired"
+      }).populate("user", "username email");
+
+      if (hiredApplication && hiredApplication.user) {
+        // Send email notification to hired freelancer
+        try {
+          await transporter.sendMail({
+            from: `BiZy Freelancing <${process.env.EMAIL_USER}>`,
+            to: hiredApplication.user.email,
+            subject: `❌ Project Cancelled: "${job.title}"`,
+            html: `
+              <h2>❌ Project Cancelled</h2>
+              <p>Hi ${hiredApplication.user.username},</p>
+              <p>Unfortunately, the project "<strong>${job.title}</strong>" has been <strong>cancelled</strong> by the client.</p>
+              <p>We apologize for any inconvenience this may cause. Please continue looking for other opportunities on BiZy Freelancing.</p>
+              <p>If you have any questions, please contact our support team.</p>
+              <p>Best regards,<br/>Team BiZy Freelancing</p>
+            `
+          });
+        } catch (emailError) {
+          console.error("Failed to send cancellation email:", emailError);
+        }
+
+        // Send real-time notification via socket
+        if (ioGlobal) {
+          ioGlobal.to(hiredApplication.user._id.toString()).emit("projectCancelled", {
+            type: "project_cancelled",
+            title: "Project Cancelled",
+            message: `The project "${job.title}" has been cancelled by the client`,
+            time: new Date().toISOString(),
+            projectId: job._id,
+            projectTitle: job.title,
+            status: "cancelled"
+          });
+        }
+
+        // Update the application status to cancelled as well
+        hiredApplication.status = "cancelled";
+        await hiredApplication.save();
+      }
     }
 
     // Update other fields
@@ -645,10 +881,25 @@ export const updateApplicationStatus = async (req, res) => {
     const { status, feedback } = req.body;
     const applicationId = req.params.applicationId;
 
-    if (!["pending", "hired", "rejected", "completed"].includes(status)) {
+    if (!status) {
       return res.status(400).json({
         success: false,
-        message: "Invalid status value",
+        message: "Status is required",
+      });
+    }
+
+    if (!["pending", "hired", "rejected", "cancelled"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status value. Allowed values: pending, hired, rejected, cancelled",
+      });
+    }
+
+    // Validate applicationId format
+    if (!applicationId || !mongoose.Types.ObjectId.isValid(applicationId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid application ID format",
       });
     }
 

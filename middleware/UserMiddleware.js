@@ -14,6 +14,14 @@ export const requireSignIn = async (req, res, next) => {
     }
 
     const token = authHeader.split(" ")[1];
+    
+    if (!token || token === 'undefined' || token === 'null') {
+      console.log('Invalid token received:', token);
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or missing token",
+      });
+    }
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -31,9 +39,11 @@ export const requireSignIn = async (req, res, next) => {
 
     // Attach user to request
     req.user = {
+      _id: user._id,
       id: user._id,
       email: user.email,
       role: user.role,
+      username: user.username,
     };
 
 

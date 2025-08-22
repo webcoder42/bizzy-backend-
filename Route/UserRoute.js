@@ -8,6 +8,7 @@ import {
   getAllUsers,
   getUserById,
   getUserCompleteDetails,
+  getPublicUserProfile,
   getUserProfile,
   getUserProjects,
   googleLogin,
@@ -97,7 +98,7 @@ router.put("/role", requireSignIn, changeUserRole);
 router.get("/get-all", requireSignIn, isAdmin, getAllUsers);
 
 // GET single user
-router.get("/get-single:id", requireSignIn, isAdmin, getUserById);
+router.get("/get-single/:id", requireSignIn, isAdmin, getUserById);
 
 // UPDATE user
 router.put("/update/:id", requireSignIn, isAdmin, updateUserById);
@@ -105,10 +106,13 @@ router.put("/update/:id", requireSignIn, isAdmin, updateUserById);
 // DELETE user
 router.delete("/delete/:id", requireSignIn, isAdmin, deleteUserById);
 
-router.get("/user/details/:id", getUserCompleteDetails);
+router.get("/user/details/:id", requireSignIn, isAdmin, getUserCompleteDetails);
+
+// Get public user profile (for clients to view applicant profiles)
+router.get("/public-profile/:id", requireSignIn, getPublicUserProfile);
 
 // Get user projects and details
-router.get("/user-projects/:userId", requireSignIn, getUserProjects);
+router.get("/user-projects/:userId", requireSignIn, isAdmin, getUserProjects);
 
 /* 
 =============================================

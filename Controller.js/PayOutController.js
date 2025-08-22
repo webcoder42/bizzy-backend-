@@ -249,6 +249,62 @@ export const getWithdrawalHistory = async (req, res) => {
   }
 };
 
+// Get withdrawal history for any user (admin only)
+export const getUserWithdrawals = async (req, res) => {
+  try {
+    // Check if the requester is an admin
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: Admin access required",
+      });
+    }
+
+    const { userId } = req.params;
+
+    // Get user's payout data
+    const payoutData = await PayOutModel.findOne({ user: userId });
+    if (!payoutData) {
+      return res.status(200).json({ 
+        success: true,
+        withdrawals: [],
+        message: "No withdrawal history found for this user"
+      });
+    }
+
+    // Sort withdrawals by requestedAt (newest first)
+    const sortedWithdrawals = payoutData.withdrawals.sort(
+      (a, b) => new Date(b.requestedAt) - new Date(a.requestedAt)
+    );
+
+    // Calculate withdrawal statistics
+    const totalWithdrawn = sortedWithdrawals
+      .filter(w => w.status === "paid")
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    const pendingWithdrawals = sortedWithdrawals
+      .filter(w => w.status === "pending" || w.status === "processing")
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    res.status(200).json({
+      success: true,
+      withdrawals: sortedWithdrawals,
+      stats: {
+        totalWithdrawn,
+        pendingWithdrawals,
+        totalRequests: sortedWithdrawals.length
+      }
+    });
+  } catch (error) {
+    console.error("Get user withdrawals error:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Internal Server Error",
+      error: error.message 
+    });
+  }
+};
+
 // Cancel withdrawal request (only if pending)
 export const cancelWithdrawal = async (req, res) => {
   try {

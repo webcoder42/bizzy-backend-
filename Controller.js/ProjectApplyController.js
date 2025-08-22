@@ -6,8 +6,158 @@ import PlanPurchaseModel from "../Model/PlanPurchaseModel.js";
 import sanitize from "mongo-sanitize";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import filter from 'leo-profanity';
 
 dotenv.config();
+
+// === Bad Words Filter Setup ===
+// Add custom bad words (English + Urdu/Hindi)
+const customBadWords = [
+  // English inappropriate words
+  'sex', 'fuck', 'shit', 'bitch', 'asshole', 'damn', 'bastard', 'whore', 'slut',
+  // Urdu/Hindi inappropriate words
+  'chutiya', 'bhenchod', 'madarchod', 'randi', 'harami', 'kamina', 'kutta', 'saala', 'behenchod',
+  'gaandu', 'randii', 'bhen chod', 'ma chod', 'bhosdike', 'lodu', 'chodu', 'kutiya',
+  // Common variations
+  'f*ck', 'sh*t', 'b*tch', 'a**hole', 'ch*tiya', 'r*ndi'
+];
+
+// Add custom words to filter
+filter.add(customBadWords);
+
+// Function to check inappropriate content
+const containsInappropriateContent = (text) => {
+  if (!text || typeof text !== 'string') return false;
+  return filter.check(text.toLowerCase());
+};
+
+// Function to send warning email
+const sendWarningEmail = async (userEmail, userName, warningCount) => {
+  const subject = "⚠️ Warning: Inappropriate Content Detected - BiZy";
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;background:#fff;border-radius:10px;padding:32px 24px;box-shadow:0 2px 12px #0001;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <img src='https://i.ibb.co/6bQ7QwM/logo512.png' alt='BiZy Logo' style='width:80px;height:80px;border-radius:16px;margin-bottom:8px;' />
+        <h2 style="color:#ff4d4f;">⚠️ Content Policy Warning</h2>
+      </div>
+      <p>Dear <b>${userName}</b>,</p>
+      <p>We detected inappropriate content in your recent application/project post.</p>
+      
+      <div style="background:#fff2f0;border-left:4px solid #ff4d4f;padding:16px;margin:16px 0;">
+        <p><b>Warning Count: ${warningCount}/2</b></p>
+        <p style="color:#ff4d4f;font-weight:bold;">
+          ${warningCount === 1 ? 
+            "This is your FIRST warning. Please avoid using inappropriate language." : 
+            "This is your FINAL warning. Next violation will result in account suspension!"
+          }
+        </p>
+      </div>
+
+      <p><b>BiZy Content Policy:</b></p>
+      <ul>
+        <li>No inappropriate, offensive, or abusive language</li>
+        <li>Professional communication only</li>
+        <li>Respectful interaction with all users</li>
+      </ul>
+
+      <p style="color:#ff4d4f;font-weight:bold;">
+        Action Required: Please review and follow our community guidelines to avoid account suspension.
+      </p>
+      
+      <br/>
+      <p style="color:#5a6bff;font-weight:bold;">BiZy Team</p>
+    </div>
+  `;
+  
+  await sendEmail(userEmail, subject, html);
+};
+
+// Function to send suspension email
+const sendSuspensionEmail = async (userEmail, userName) => {
+  const subject = "🚫 Account Suspended - BiZy";
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:auto;background:#fff;border-radius:10px;padding:32px 24px;box-shadow:0 2px 12px #0001;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <img src='https://i.ibb.co/6bQ7QwM/logo512.png' alt='BiZy Logo' style='width:80px;height:80px;border-radius:16px;margin-bottom:8px;' />
+        <h2 style="color:#ff4d4f;">🚫 Account Suspended</h2>
+      </div>
+      <p>Dear <b>${userName}</b>,</p>
+      <p>Your BiZy account has been <b style="color:#ff4d4f;">SUSPENDED</b> due to repeated violations of our content policy.</p>
+      
+      <div style="background:#fff2f0;border-left:4px solid #ff4d4f;padding:16px;margin:16px 0;">
+        <p><b>Reason:</b> Multiple inappropriate content violations</p>
+        <p><b>Status:</b> Account access temporarily restricted</p>
+      </div>
+
+      <p><b>What happens now:</b></p>
+      <ul>
+        <li>Your account access is temporarily suspended</li>
+        <li>You cannot apply to projects or post new projects</li>
+        <li>Contact support for account review</li>
+      </ul>
+
+      <p>To restore your account, please contact our support team and acknowledge that you will follow our community guidelines.</p>
+      
+      <br/>
+      <p style="color:#5a6bff;font-weight:bold;">BiZy Support Team</p>
+    </div>
+  `;
+  
+  await sendEmail(userEmail, subject, html);
+};
+
+// Function to handle inappropriate content violation
+const handleInappropriateContentViolation = async (userId, content, violationType) => {
+  try {
+    // Get user details
+    const user = await UserModel.findById(userId);
+    if (!user) return { suspended: false, warningCount: 0 };
+
+    // Initialize warnings if not exists
+    if (!user.warnings || !user.warnings.inappropriateContent) {
+      user.warnings = {
+        inappropriateContent: {
+          count: 0,
+          warningHistory: []
+        }
+      };
+    }
+
+    // Increment warning count
+    user.warnings.inappropriateContent.count += 1;
+    user.warnings.inappropriateContent.lastWarningDate = new Date();
+    
+    // Add to warning history
+    user.warnings.inappropriateContent.warningHistory.push({
+      date: new Date(),
+      reason: violationType,
+      content: content.substring(0, 100) // Store first 100 chars only
+    });
+
+    const warningCount = user.warnings.inappropriateContent.count;
+
+    if (warningCount >= 2) {
+      // Suspend account after 2 warnings
+      user.accountStatus = "suspended";
+      await user.save();
+      
+      // Send suspension email
+      await sendSuspensionEmail(user.email, user.Fullname || user.username);
+      
+      return { suspended: true, warningCount };
+    } else {
+      // Send warning email for first violation
+      await user.save();
+      await sendWarningEmail(user.email, user.Fullname || user.username, warningCount);
+      
+      return { suspended: false, warningCount };
+    }
+  } catch (error) {
+    console.error("Error handling inappropriate content violation:", error);
+    return { suspended: false, warningCount: 0 };
+  }
+};
+
 // === Nodemailer Transporter ===
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -48,6 +198,57 @@ export const applyToProject = async (req, res) => {
     const description = sanitize(req.body.description);
     const skills = sanitize(req.body.skills);
     const cvFilePath = req.file ? `/uploads/cvs/${req.file.filename}` : null;
+
+    // ✅ Content Validation - Check for inappropriate words
+    if (containsInappropriateContent(description)) {
+      // Handle violation and send warning/suspension
+      const violation = await handleInappropriateContentViolation(userId, description, "Inappropriate content in project application description");
+      
+      console.warn(`🚨 Inappropriate content detected in description - User ID: ${userId}, Project ID: ${projectId}, Warning Count: ${violation.warningCount}`);
+      
+      if (violation.suspended) {
+        return res.status(403).json({
+          success: false,
+          message: "Your account has been suspended due to repeated inappropriate content violations. Please contact support.",
+          code: "ACCOUNT_SUSPENDED",
+          warningCount: violation.warningCount,
+          forceLogout: true
+        });
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: `Warning ${violation.warningCount}/2: Your proposal contains inappropriate content. ${violation.warningCount === 1 ? 'This is your first warning.' : 'This is your final warning - next violation will suspend your account!'} Please revise your description and try again.`,
+        code: "INAPPROPRIATE_CONTENT_DESCRIPTION",
+        warningCount: violation.warningCount,
+        isWarning: true
+      });
+    }
+
+    if (containsInappropriateContent(skills)) {
+      // Handle violation and send warning/suspension
+      const violation = await handleInappropriateContentViolation(userId, skills, "Inappropriate content in project application skills");
+      
+      console.warn(`🚨 Inappropriate content detected in skills - User ID: ${userId}, Project ID: ${projectId}, Warning Count: ${violation.warningCount}`);
+      
+      if (violation.suspended) {
+        return res.status(403).json({
+          success: false,
+          message: "Your account has been suspended due to repeated inappropriate content violations. Please contact support.",
+          code: "ACCOUNT_SUSPENDED",
+          warningCount: violation.warningCount,
+          forceLogout: true
+        });
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: `Warning ${violation.warningCount}/2: Your skills section contains inappropriate content. ${violation.warningCount === 1 ? 'This is your first warning.' : 'This is your final warning - next violation will suspend your account!'} Please revise and try again.`,
+        code: "INAPPROPRIATE_CONTENT_SKILLS",
+        warningCount: violation.warningCount,
+        isWarning: true
+      });
+    }
 
     // ✅ 2. Validate project ID
     if (!mongoose.Types.ObjectId.isValid(projectId)) {
